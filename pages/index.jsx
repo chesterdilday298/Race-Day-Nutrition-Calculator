@@ -372,10 +372,7 @@ export default function HolidayNutritionPlanner() {
         right: 0,
         bottom: 0,
         opacity: 0.03,
-        backgroundImage: \`
-          repeating-linear-gradient(0deg, ${colors.primary}, ${colors.primary} 1px, transparent 1px, transparent 40px),
-          repeating-linear-gradient(90deg, ${colors.primary}, ${colors.primary} 1px, transparent 1px, transparent 40px)
-        \`,
+        backgroundImage: 'repeating-linear-gradient(0deg, ' + colors.primary + ', ' + colors.primary + ' 1px, transparent 1px, transparent 40px), repeating-linear-gradient(90deg, ' + colors.primary + ', ' + colors.primary + ' 1px, transparent 1px, transparent 40px)',
         pointerEvents: 'none',
         zIndex: 0
       }} />
@@ -395,7 +392,7 @@ export default function HolidayNutritionPlanner() {
             fontSize: 'clamp(32px, 8vw, 64px)',
             fontWeight: '900',
             margin: '0 0 12px 0',
-            background: \`linear-gradient(135deg, ${colors.primary} 0%, #ff6b6b 100%)\`,
+            background: 'linear-gradient(135deg, ' + colors.primary + ' 0%, #ff6b6b 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',

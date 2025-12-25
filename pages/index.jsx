@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function HolidayNutritionPlanner() {
+export default function RaceTrainingNutritionPlanner() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     gender: '',
@@ -12,7 +12,6 @@ export default function HolidayNutritionPlanner() {
     height: '',
     targetWeight: '',
     raceDate: '',
-    holidayEvents: '',
     weightLossRate: '', // 0.5, 1, 1.5, 2, or 'maintain'
     trainingDays: []
   });
@@ -190,22 +189,22 @@ export default function HolidayNutritionPlanner() {
     
     if (weightToLose <= 0) {
       recommendedRate = 'maintain';
-      reasoning = "You're at or below target weight. Focus on maintenance or muscle gain.";
+      reasoning = "Your current weight aligns with your target. A maintenance approach will support performance optimization and body composition.";
     } else if (weightToLose < 10) {
       recommendedRate = '0.5';
-      reasoning = "For small weight loss goals (<10 lbs), slower is better to preserve muscle and performance.";
+      reasoning = "For body composition refinement under 10 pounds, a conservative approach optimally preserves lean muscle mass and training adaptations.";
     } else if (weightToLose < 20) {
       recommendedRate = '1.0';
-      reasoning = "Moderate deficit maintains training performance while losing fat steadily.";
+      reasoning = "A moderate caloric deficit strategically balances fat loss with athletic performance, ensuring training quality remains high.";
     } else if (weightToLose < 50) {
       recommendedRate = '1.0';
-      reasoning = "Good balance of fat loss and athletic performance for your goal.";
+      reasoning = "This rate provides an optimal balance between achieving your body composition goals and maintaining the training intensity required for peak race performance.";
       if (hours < 8) {
         warnings.push("Consider 1.5 lb/week if you feel strong - your training volume can support it.");
       }
     } else {
       recommendedRate = '1.5';
-      reasoning = "With substantial weight to lose, start with moderate deficit. You can adjust based on how you feel.";
+      reasoning = "For significant body composition changes, this moderate approach establishes a sustainable foundation. We'll monitor your response and adjust as needed to optimize both fat loss and performance.";
     }
     
     // Athlete-specific adjustments
@@ -262,6 +261,25 @@ export default function HolidayNutritionPlanner() {
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
+  };
+
+  const resetCalculator = () => {
+    setStep(1);
+    setResults(null);
+    setFormData({
+      gender: '',
+      age: '',
+      sport: '',
+      weeklyHours: '',
+      goal: '',
+      currentWeight: '',
+      height: '',
+      targetWeight: '',
+      raceDate: '',
+      weightLossRate: '',
+      trainingDays: []
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Keystone Endurance logo as base64 embedded image
@@ -580,7 +598,7 @@ export default function HolidayNutritionPlanner() {
             fontFamily: 'Inter, sans-serif',
             fontWeight: '600'
           }}>
-            HOLIDAY NUTRITION PLANNER
+            RACE TRAINING NUTRITION PLANNER
           </div>
         </div>
       </div>
@@ -978,29 +996,6 @@ export default function HolidayNutritionPlanner() {
                   fontWeight: '600',
                   color: colors.charcoal
                 }}>
-                  HOLIDAY EVENTS/PARTIES IN DECEMBER
-                </label>
-                <select
-                  value={formData.holidayEvents}
-                  onChange={(e) => updateFormData('holidayEvents', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    fontSize: '18px',
-                    border: `2px solid ${colors.primary}40`,
-                    borderRadius: '8px',
-                    fontFamily: 'Inter, sans-serif',
-                    background: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="">Select number...</option>
-                  <option value="1-2">1-2 events</option>
-                  <option value="3-5">3-5 events</option>
-                  <option value="6-8">6-8 events</option>
-                  <option value="9+">9+ events (busy month!)</option>
-                </select>
-              </div>
             </div>
 
             <div style={{ marginTop: '36px', display: 'flex', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
@@ -1026,32 +1021,6 @@ export default function HolidayNutritionPlanner() {
               </button>
               <button
                 onClick={nextStep}
-                disabled={!formData.weeklyHours || formData.trainingDays.length === 0 || !formData.holidayEvents}
-                style={{
-                  flex: 2,
-                  padding: '16px 8px',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  background: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents
-                    ? colors.primary
-                    : '#cccccc',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '12px',
-                  cursor: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s',
-                  boxShadow: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents
-                    ? `0 6px 20px ${colors.primary}60`
-                    : 'none',
-                  letterSpacing: '0.5px',
-                  whiteSpace: 'nowrap',
-                  boxSizing: 'border-box'
-                }}
-              >
-                CONTINUE →
-              </button>
-            </div>
-          </div>
         )}
 
         {step === 3 && (
@@ -1377,6 +1346,41 @@ export default function HolidayNutritionPlanner() {
                 }}>
                   If body composition is part of your strategy
                 </div>
+
+              <div style={{marginBottom: '20px'}}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  fontSize: '16px',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: '600',
+                  color: colors.charcoal
+                }}>
+                  TARGET RACE DATE
+                </label>
+                <input
+                  type="date"
+                  value={formData.raceDate}
+                  onChange={(e) => updateFormData('raceDate', e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    fontSize: '18px',
+                    border: `2px solid ${colors.primary}40`,
+                    borderRadius: '8px',
+                    fontFamily: 'Inter, sans-serif'
+                  }}
+                />
+                <div style={{
+                  fontSize: '14px',
+                  color: '#666',
+                  marginTop: '8px',
+                  fontFamily: 'Inter, sans-serif'
+                }}>
+                  Your nutrition strategy will be optimized to achieve your goal weight by race day
+                </div>
+              </div>
               </div>
 
               <div style={{
@@ -1477,6 +1481,35 @@ export default function HolidayNutritionPlanner() {
                 textAlign: 'center',
                 marginBottom: '36px'
               }}>
+            <div style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              zIndex: 10
+            }}>
+              <button
+                onClick={resetCalculator}
+                style={{
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  background: colors.primary,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  letterSpacing: '1px',
+                  fontFamily: 'Inter, sans-serif',
+                  boxShadow: '0 4px 12px rgba(214, 32, 39, 0.3)'
+                }}
+                onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                ↻ START OVER
+              </button>
+            </div>
+
                 <h1 style={{
                   fontSize: '52px',
                   margin: '0 0 12px 0',
@@ -2162,32 +2195,6 @@ export default function HolidayNutritionPlanner() {
                 setStep(1); 
                 setFormData({ 
                   gender: '', age: '', sport: '', weeklyHours: '', goal: '', 
-                  currentWeight: '', height: '', targetWeight: '', holidayEvents: '', 
-                  trainingDays: [] 
-                }); 
-                setResults(null);
-                setTimeout(() => {
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }, 100);
-              }}
-              style={{
-                width: '100%',
-                padding: '16px',
-                fontSize: '18px',
-                fontWeight: 'bold',
-                background: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                border: '2px solid white',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                letterSpacing: '1px',
-                fontFamily: 'Inter, sans-serif'
-              }}
-            >
-              START OVER
-            </button>
-          </div>
         </div>
           );
         })()}

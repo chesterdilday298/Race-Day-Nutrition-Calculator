@@ -1013,21 +1013,21 @@ export default function RaceTrainingNutritionGuide() {
               </button>
               <button
                 onClick={nextStep}
-                disabled={!formData.weeklyHours || formData.trainingDays.length === 0 || !formData.holidayEvents}
+                disabled={!formData.weeklyHours || formData.trainingDays.length === 0}
                 style={{
                   flex: 2,
                   padding: '16px 8px',
                   fontSize: '16px',
                   fontWeight: 'bold',
-                  background: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents
+                  background: formData.weeklyHours && formData.trainingDays.length > 0
                     ? colors.primary
                     : '#cccccc',
                   color: 'white',
                   border: 'none',
                   borderRadius: '12px',
-                  cursor: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents ? 'pointer' : 'not-allowed',
+                  cursor: formData.weeklyHours && formData.trainingDays.length > 0 ? 'pointer' : 'not-allowed',
                   transition: 'all 0.2s',
-                  boxShadow: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents
+                  boxShadow: formData.weeklyHours && formData.trainingDays.length > 0
                     ? `0 6px 20px ${colors.primary}60`
                     : 'none',
                   letterSpacing: '0.5px',

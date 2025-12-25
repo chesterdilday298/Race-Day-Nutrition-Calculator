@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 export default function HolidayNutritionPlanner() {
   const [step, setStep] = useState(1);
@@ -11,19 +11,18 @@ export default function HolidayNutritionPlanner() {
     currentWeight: '',
     height: '',
     targetWeight: '',
+    raceDate: '',
     holidayEvents: '',
+    weightLossRate: '',
     trainingDays: []
   });
   const [results, setResults] = useState(null);
 
-  // Keystone Endurance brand colors
   const colors = {
-    primary: '#D62027', // Red
-    charcoal: '#231F20', // Charcoal Black
-    maroon: '#600D0D', // Maroon
-    steel: '#D62027', // Changed to Red (was Steel/Cement)
-    teal: '#D62027', // Changed to Red (was Teal/Cool Grey)
-    light: '#F4F4F9' // Light background
+    primary: '#C41E3A',
+    steel: '#4A5568',
+    charcoal: '#2D3748',
+    teal: '#2C7A7B'
   };
 
   const updateFormData = (field, value) => {
@@ -33,6 +32,7 @@ export default function HolidayNutritionPlanner() {
   const calculateNutrition = () => {
     // Convert lbs to kg and inches to cm for calculations
     const weightKg = parseFloat(formData.currentWeight) * 0.453592 || 70;
+    const targetWeightKg = parseFloat(formData.targetWeight) * 0.453592 || weightKg;
     const heightCm = parseFloat(formData.height) * 2.54 || 170;
     const hours = parseFloat(formData.weeklyHours) || 5;
     const age = parseInt(formData.age) || 45;
@@ -49,54 +49,112 @@ export default function HolidayNutritionPlanner() {
     // Activity multipliers for endurance athletes
     let activityMultiplier;
     if (hours < 5) {
-      activityMultiplier = 1.55; // Moderate activity
+      activityMultiplier = 1.55;
     } else if (hours < 10) {
-      activityMultiplier = 1.65; // Active
+      activityMultiplier = 1.65;
     } else if (hours < 15) {
-      activityMultiplier = 1.725; // Very active
+      activityMultiplier = 1.725;
     } else {
-      activityMultiplier = 1.9; // Extremely active
+      activityMultiplier = 1.9;
     }
     
-    const trainingDayCalories = Math.round(bmr * activityMultiplier);
+    // Calculate MAINTENANCE calories (TDEE)
+    const maintenanceTraining = Math.round(bmr * activityMultiplier);
+    const maintenanceRest = Math.round(bmr * 1.3);
     
-    // Rest day multiplier
-    const restMultiplier = 1.3; // Light activity on rest days
-    const restDayCalories = Math.round(bmr * restMultiplier);
+    // Calculate deficit based on weight loss rate
+    const deficitPerDay = {
+      '0.5': 250,
+      '1.0': 500,
+      '1.5': 750,
+      '2.0': 1000,
+      'maintain': 0
+    }[formData.weightLossRate] || 0;
     
-    // Protein for athletes (2.0-2.2g per kg body weight)
-    const proteinMultiplier = gender === 'male' ? 2.2 : 2.0;
-    const proteinGrams = Math.round(weightKg * proteinMultiplier);
+    // Apply deficit to get weight loss calories
+    let trainingDayCalories = maintenanceTraining - deficitPerDay;
+    let restDayCalories = maintenanceRest - deficitPerDay;
+    
+    // Safety check: Don't go below minimums
+    const minCaloriesTraining = Math.round(bmr * 1.2);
+    const minCaloriesRest = Math.round(bmr);
+    
+    trainingDayCalories = Math.max(trainingDayCalories, minCaloriesTraining);
+    restDayCalories = Math.max(restDayCalories, minCaloriesRest);
+    
+    // Calculate if safety minimum was hit
+    const hitMinimumTraining = (maintenanceTraining - deficitPerDay) < minCaloriesTraining;
+    const hitMinimumRest = (maintenanceRest - deficitPerDay) < minCaloriesRest;
+    
+    // FIXED: Calculate macros to FIT the calorie target (not from body weight formulas)
+    // Protein for athletes (2.0g per kg body weight - essential for muscle preservation)
+    const proteinGrams = Math.round(weightKg * 2.0);
     const proteinCals = proteinGrams * 4;
     
-    // Carbs based on training volume
-    const trainingCarbMultiplier = hours < 8 ? 5 : hours < 12 ? 6 : 7;
-    const trainingCarbGrams = Math.round(weightKg * trainingCarbMultiplier);
-    const trainingCarbCals = trainingCarbGrams * 4;
+    // Calculate remaining calories after protein
+    const remainingTrainingCals = trainingDayCalories - proteinCals;
+    const remainingRestCals = restDayCalories - proteinCals;
     
-    const restCarbGrams = Math.round(weightKg * 3.5);
-    const restCarbCals = restCarbGrams * 4;
+    // Distribute remaining calories between carbs and fat
+    // Training days: 70% carbs, 30% fat (need fuel for workouts)
+    // Rest days: 50% carbs, 50% fat (lower carb need)
+    const trainingCarbCals = Math.round(remainingTrainingCals * 0.70);
+    const trainingFatCals = remainingTrainingCals - trainingCarbCals;
+    const trainingCarbGrams = Math.round(trainingCarbCals / 4);
+    const trainingFatGrams = Math.round(trainingFatCals / 9);
     
-    // Fat fills remaining calories
-    const trainingFatCals = trainingDayCalories - proteinCals - trainingCarbCals;
-    const trainingFatGrams = Math.round(Math.max(trainingFatCals / 9, 40));
+    const restCarbCals = Math.round(remainingRestCals * 0.50);
+    const restFatCals = remainingRestCals - restCarbCals;
+    const restCarbGrams = Math.round(restCarbCals / 4);
+    const restFatGrams = Math.round(restFatCals / 9);
     
-    const restFatCals = restDayCalories - proteinCals - restCarbCals;
-    const restFatGrams = Math.round(Math.max(restFatCals / 9, 45));
-    
-    // Recalculate total calories
+    // Recalculate actual total calories based on macros (should match target closely)
     const finalTrainingCalories = (proteinGrams * 4) + (trainingCarbGrams * 4) + (trainingFatGrams * 9);
     const finalRestCalories = (proteinGrams * 4) + (restCarbGrams * 4) + (restFatGrams * 9);
     
+    // Calculate weight loss projections
+    const weightToLose = parseFloat(formData.currentWeight) - parseFloat(formData.targetWeight);
+    const weeklyDeficit = (deficitPerDay * 7);
+    const expectedWeeklyLoss = weeklyDeficit / 3500;
+    const weeksToGoal = weightToLose > 0 && expectedWeeklyLoss > 0 ? Math.ceil(weightToLose / expectedWeeklyLoss) : 0;
+    
+    // Calculate goal date
+    const goalDate = new Date();
+    goalDate.setDate(goalDate.getDate() + (weeksToGoal * 7));
+    const goalDateStr = goalDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    // Calculate race date projections if race date provided
+    let weeksToRace = 0;
+    let projectedRaceWeight = parseFloat(formData.currentWeight);
+    let raceDateStr = '';
+    
+    if (formData.raceDate) {
+      const raceDate = new Date(formData.raceDate);
+      const today = new Date();
+      const timeDiff = raceDate - today;
+      weeksToRace = Math.floor(timeDiff / (7 * 24 * 60 * 60 * 1000));
+      
+      if (weeksToRace > 0 && expectedWeeklyLoss > 0) {
+        const totalWeightLoss = expectedWeeklyLoss * weeksToRace;
+        projectedRaceWeight = parseFloat(formData.currentWeight) - totalWeightLoss;
+      }
+      
+      raceDateStr = raceDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    }
+    
     setResults({
       training: { 
-        calories: finalTrainingCalories, 
+        calories: finalTrainingCalories,
+        maintenance: maintenanceTraining,
+        deficit: deficitPerDay,
         protein: proteinGrams, 
         carbs: trainingCarbGrams, 
         fat: trainingFatGrams 
       },
       rest: { 
-        calories: finalRestCalories, 
+        calories: finalRestCalories,
+        maintenance: maintenanceRest,
+        deficit: deficitPerDay,
         protein: proteinGrams, 
         carbs: restCarbGrams, 
         fat: restFatGrams 
@@ -106,6 +164,19 @@ export default function HolidayNutritionPlanner() {
         baseCalories: Math.round((finalTrainingCalories + finalRestCalories) / 2)
       },
       bmr: Math.round(bmr),
+      weightLossRate: formData.weightLossRate,
+      weightToLose: weightToLose,
+      weeklyDeficit: weeklyDeficit,
+      expectedWeeklyLoss: expectedWeeklyLoss,
+      weeksToGoal: weeksToGoal,
+      goalDate: goalDateStr,
+      weeksToRace: weeksToRace,
+      projectedRaceWeight: projectedRaceWeight,
+      raceDate: raceDateStr,
+      targetWeight: parseFloat(formData.targetWeight) || 0,
+      currentWeight: parseFloat(formData.currentWeight) || 0,
+      hitMinimumTraining: hitMinimumTraining,
+      hitMinimumRest: hitMinimumRest,
       weeklyCalories: Math.round(
         (finalTrainingCalories * formData.trainingDays.length) + 
         (finalRestCalories * (7 - formData.trainingDays.length))
@@ -113,9 +184,94 @@ export default function HolidayNutritionPlanner() {
     });
   };
 
+  const getWeightLossRecommendation = () => {
+    const weightToLose = parseFloat(formData.currentWeight) - parseFloat(formData.targetWeight);
+    const hours = parseFloat(formData.weeklyHours) || 5;
+    const weeksToRace = formData.raceDate ? (() => {
+      const raceDate = new Date(formData.raceDate);
+      const today = new Date();
+      const timeDiff = raceDate - today;
+      return Math.floor(timeDiff / (7 * 24 * 60 * 60 * 1000));
+    })() : 0;
+    
+    let recommendedRate = '1.0';
+    let reasoning = '';
+    let warnings = [];
+    
+    if (weightToLose <= 0) {
+      recommendedRate = 'maintain';
+      reasoning = "Target weight is at or above current weight. Maintenance calories are recommended.";
+    } else if (weightToLose < 10) {
+      recommendedRate = '0.5';
+      reasoning = "For weight loss goals under 10 pounds, a conservative approach preserves muscle mass and training performance.";
+    } else if (weightToLose < 20) {
+      recommendedRate = '1.0';
+      reasoning = "A moderate deficit maintains training performance while achieving steady fat loss.";
+    } else if (weightToLose < 50) {
+      recommendedRate = '1.0';
+      reasoning = "This rate balances fat loss with athletic performance for the identified goal.";
+      if (hours < 8) {
+        warnings.push("💡 With moderate training volume, 1.5 lb/week may be sustainable if energy levels remain strong.");
+      }
+    } else {
+      recommendedRate = '1.5';
+      reasoning = "With substantial weight to lose, a moderate deficit is appropriate. Adjustments can be made based on response.";
+    }
+    
+    // Race-specific recommendations
+    if (weeksToRace > 0 && weightToLose > 0) {
+      const idealRate = weightToLose / weeksToRace;
+      if (idealRate > 2.0) {
+        warnings.push(`⚠️ Race timeline requires ${idealRate.toFixed(1)} lb/week to reach goal weight. This may be too aggressive. Consider adjusting either the goal weight or race selection.`);
+      } else if (idealRate >= 1.5) {
+        recommendedRate = '1.5';
+        reasoning = `With ${weeksToRace} weeks until race day, a 1.5 lb/week approach aligns well with the timeline.`;
+      } else if (idealRate >= 1.0) {
+        recommendedRate = '1.0';
+        reasoning = `With ${weeksToRace} weeks until race day, a 1 lb/week approach provides adequate time to reach the goal.`;
+      }
+    }
+    
+    // Athlete-specific adjustments
+    if (hours > 12 && weightToLose > 10) {
+      warnings.push("⚠️ High training volume detected. Energy availability for workouts should be prioritized over aggressive deficits.");
+    }
+    
+    return { recommendedRate, reasoning, warnings, weightToLose, weeksToRace };
+  };
+
+  const getSafetyWarning = (rate) => {
+    const weightToLose = parseFloat(formData.currentWeight) - parseFloat(formData.targetWeight);
+    const hours = parseFloat(formData.weeklyHours) || 5;
+    const warnings = [];
+    
+    if (weightToLose < 20 && parseFloat(rate) >= 1.5) {
+      warnings.push({
+        type: 'warning',
+        message: '⚠️ For weight loss under 20 pounds, rates of 0.5-1 lb/week better preserve muscle mass and training performance.'
+      });
+    }
+    
+    if (hours > 10 && parseFloat(rate) >= 2.0) {
+      warnings.push({
+        type: 'danger',
+        message: '🚨 High training volume combined with aggressive deficits increases risk of overtraining, immune suppression, and performance decline. Maximum recommended rate: 1-1.5 lb/week.'
+      });
+    }
+    
+    if (parseFloat(rate) >= 2.0) {
+      warnings.push({
+        type: 'warning',
+        message: '⚠️ Losing 2+ pounds per week is aggressive. Close monitoring of energy levels, recovery, and training quality is essential.'
+      });
+    }
+    
+    return warnings;
+  };
+
   const nextStep = () => {
-    if (step < 4) setStep(step + 1);
-    if (step === 3) calculateNutrition();
+    if (step < 5) setStep(step + 1);
+    if (step === 4) calculateNutrition();
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
@@ -128,358 +284,143 @@ export default function HolidayNutritionPlanner() {
     }, 100);
   };
 
-  // Keystone Endurance logo as base64 embedded image
-  const logoBase64 = "data:image/webp;base64,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";
+  const resetCalculator = () => {
+    setStep(1);
+    setResults(null);
+    setFormData({
+      gender: '',
+      age: '',
+      sport: '',
+      weeklyHours: '',
+      goal: '',
+      currentWeight: '',
+      height: '',
+      targetWeight: '',
+      raceDate: '',
+      holidayEvents: '',
+      weightLossRate: '',
+      trainingDays: []
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div style={{
       minHeight: '100vh',
-      background: `linear-gradient(135deg, ${colors.charcoal} 0%, ${colors.steel} 100%)`,
-      fontFamily: "'Bebas Neue', 'Impact', sans-serif",
+      background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+      padding: '20px',
+      fontFamily: 'system-ui, -apple-system, sans-serif',
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Animated background elements */}
-      <div style={{
-        position: 'absolute',
-        top: '-10%',
-        right: '-5%',
-        width: '600px',
-        height: '600px',
-        borderRadius: '50%',
-        background: `radial-gradient(circle, ${colors.primary}15 0%, transparent 70%)`,
-        animation: 'pulse 4s ease-in-out infinite',
-        pointerEvents: 'none'
-      }} />
-      <div style={{
-        position: 'absolute',
-        bottom: '-15%',
-        left: '-10%',
-        width: '700px',
-        height: '700px',
-        borderRadius: '50%',
-        background: `radial-gradient(circle, ${colors.teal}10 0%, transparent 70%)`,
-        animation: 'pulse 5s ease-in-out infinite 1s',
-        pointerEvents: 'none'
-      }} />
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap');
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 0.3; }
-          50% { transform: scale(1.1); opacity: 0.5; }
+        * {
+          box-sizing: border-box;
         }
         
-        @keyframes slideInUp {
-          from { transform: translateY(30px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
+        input, select, button {
+          font-size: 16px !important;
         }
-
-        .progress-bar {
-          transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .card-enter {
-          animation: slideInUp 0.5s ease-out;
-        }
-
-        button:active {
-          transform: scale(0.96);
-        }
-
+        
         input:focus, select:focus {
           outline: none;
-          box-shadow: 0 0 0 3px ${colors.primary}40;
+          border-color: ${colors.primary} !important;
         }
-
-        .checkbox-wrapper input[type="checkbox"] {
-          appearance: none;
-          width: 22px;
-          height: 22px;
-          border: 2px solid ${colors.primary};
-          border-radius: 4px;
-          cursor: pointer;
-          position: relative;
-          transition: all 0.2s;
+        
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
-
-        .checkbox-wrapper input[type="checkbox"]:checked {
-          background: ${colors.primary};
+        
+        .card-enter {
+          animation: slideIn 0.4s ease-out;
         }
-
-        .checkbox-wrapper input[type="checkbox"]:checked::after {
-          content: '✓';
-          position: absolute;
-          color: white;
-          font-size: 16px;
-          font-weight: bold;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-        }
-
+        
         .result-card {
           transition: transform 0.2s, box-shadow 0.2s;
         }
-
+        
         .result-card:hover {
           transform: translateY(-4px);
-          box-shadow: 0 12px 24px rgba(0,0,0,0.3);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.2) !important;
         }
-
-        /* Mobile Responsive Styles - Enhanced */
-        * {
-          box-sizing: border-box;
-          -webkit-tap-highlight-color: transparent;
+        
+        .progress-bar {
+          transition: width 0.3s ease-out;
         }
-
-        body {
-          overflow-x: hidden;
-          max-width: 100vw;
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-        }
-
-        input, select, button {
-          -webkit-appearance: none;
-          -moz-appearance: none;
-          appearance: none;
-          border-radius: 8px;
-        }
-
-        input, select {
-          font-size: 16px !important; /* Prevents iOS zoom on focus */
-          touch-action: manipulation;
-        }
-
-        button {
-          touch-action: manipulation;
-          cursor: pointer;
-        }
-
-        /* Tablets and small laptops */
+        
         @media (max-width: 768px) {
-          .result-card {
-            padding: 14px !important;
-            margin: 0 !important;
-          }
-          
-          h1 {
-            font-size: 32px !important;
-            word-wrap: break-word;
-          }
-          
-          h2 {
-            font-size: 20px !important;
-            word-wrap: break-word;
-          }
-
-          h3 {
-            font-size: 17px !important;
-          }
-
-          p, div, span {
-            word-wrap: break-word;
-            overflow-wrap: break-word;
-            word-break: break-word;
-          }
-
-          [style*="gridTemplateColumns"] {
-            grid-template-columns: 1fr !important;
-          }
-
-          [style*="minmax(250px"] {
-            grid-template-columns: 1fr !important;
-          }
-
-          [style*="minmax(200px"] {
-            grid-template-columns: 1fr !important;
-          }
-
-          .result-card {
-            max-width: 100% !important;
-            margin: 0 !important;
-          }
-
-          button {
-            font-size: 15px !important;
-            padding: 14px !important;
-            max-width: 100% !important;
-            letter-spacing: 0.3px !important;
-          }
-        }
-
-        /* Large phones (iPhone 14 Pro Max, large Androids) */
-        @media (max-width: 430px) {
-          h1 {
-            font-size: 30px !important;
-          }
-
-          h2 {
-            font-size: 19px !important;
-          }
-
-          h3 {
+          input, select, button {
             font-size: 16px !important;
-          }
-
-          button {
-            font-size: 14px !important;
-            padding: 13px !important;
-          }
-
-          .result-card {
-            padding: 13px !important;
-          }
-        }
-
-        /* Standard phones (iPhone 12/13/14, mid Androids) */
-        @media (max-width: 390px) {
-          h1 {
-            font-size: 28px !important;
-          }
-
-          h2 {
-            font-size: 18px !important;
-          }
-
-          h3 {
-            font-size: 15px !important;
-          }
-
-          button {
-            font-size: 13px !important;
-            padding: 12px !important;
-          }
-
-          .result-card {
-            padding: 12px !important;
-          }
-        }
-
-        /* Older/smaller phones (iPhone 6/7/8/SE, small Androids) */
-        @media (max-width: 375px) {
-          h1 {
-            font-size: 26px !important;
-          }
-
-          h2 {
-            font-size: 17px !important;
-          }
-
-          h3 {
-            font-size: 14px !important;
-          }
-
-          button {
-            font-size: 12px !important;
-            padding: 11px !important;
-            letter-spacing: 0.2px !important;
-          }
-
-          .result-card {
-            padding: 11px !important;
-          }
-        }
-
-        /* Very small phones (iPhone 5/SE 1st gen, very small Androids) */
-        @media (max-width: 320px) {
-          h1 {
-            font-size: 24px !important;
-          }
-
-          h2 {
-            font-size: 16px !important;
-          }
-
-          h3 {
-            font-size: 13px !important;
-          }
-
-          button {
-            font-size: 11px !important;
-            padding: 10px !important;
-            letter-spacing: 0px !important;
-          }
-
-          .result-card {
-            padding: 10px !important;
           }
         }
       `}</style>
 
+      {/* Background Pattern */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        opacity: 0.03,
+        backgroundImage: \`
+          repeating-linear-gradient(0deg, ${colors.primary}, ${colors.primary} 1px, transparent 1px, transparent 40px),
+          repeating-linear-gradient(90deg, ${colors.primary}, ${colors.primary} 1px, transparent 1px, transparent 40px)
+        \`,
+        pointerEvents: 'none',
+        zIndex: 0
+      }} />
+
       {/* Header */}
       <div style={{
-        background: 'white',
-        padding: '24px',
-        borderBottom: `4px solid ${colors.primary}`,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        maxWidth: '900px',
+        margin: '0 auto 40px',
         position: 'relative',
-        zIndex: 10
+        zIndex: 1
       }}>
         <div style={{
-          maxWidth: '900px',
-          margin: '0 auto',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column'
+          textAlign: 'center',
+          marginBottom: '24px'
         }}>
-          {/* Keystone Endurance Logo */}
-          <img 
-            src={logoBase64}
-            alt="Keystone Endurance"
-            style={{
-              height: '100px',
-              width: 'auto'
-            }}
-          />
-          
-          <div style={{
-            marginTop: '12px',
-            fontSize: '13px',
-            color: colors.primary,
+          <h1 style={{
+            fontSize: 'clamp(32px, 8vw, 64px)',
+            fontWeight: '900',
+            margin: '0 0 12px 0',
+            background: \`linear-gradient(135deg, ${colors.primary} 0%, #ff6b6b 100%)\`,
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
             letterSpacing: '2px',
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: '600'
+            textShadow: '0 0 40px rgba(196, 30, 58, 0.3)'
           }}>
-            HOLIDAY NUTRITION PLANNER
-          </div>
+            KEYSTONE ENDURANCE
+          </h1>
+          <p style={{
+            fontSize: 'clamp(18px, 4vw, 28px)',
+            color: 'white',
+            margin: 0,
+            fontWeight: '300',
+            letterSpacing: '3px',
+            textTransform: 'uppercase',
+            opacity: 0.9
+          }}>
+            Race Nutrition Calculator
+          </p>
         </div>
-      </div>
 
-      {/* Progress Bar */}
-      <div style={{
-        background: 'white',
-        padding: '0',
-        position: 'relative',
-        zIndex: 5
-      }}>
+        {/* Progress Bar */}
         <div style={{
-          maxWidth: '900px',
-          margin: '0 auto',
-          padding: '16px 20px'
+          marginTop: '32px'
         }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '8px'
-          }}>
-            {['Profile', 'Training', 'Goals', 'Results'].map((label, idx) => (
-              <div key={idx} style={{
-                fontSize: '13px',
-                fontFamily: 'Inter, sans-serif',
-                fontWeight: '600',
-                color: step >= idx + 1 ? colors.primary : 'black',
-                opacity: step >= idx + 1 ? 1 : 0.4,
-                transition: 'color 0.3s'
-              }}>
-                {label}
-              </div>
-            ))}
-          </div>
           <div style={{
             width: '100%',
             height: '8px',
@@ -488,7 +429,7 @@ export default function HolidayNutritionPlanner() {
             overflow: 'hidden'
           }}>
             <div className="progress-bar" style={{
-              width: `${(step / 4) * 100}%`,
+              width: `${(step / 5) * 100}%`,
               height: '100%',
               background: colors.primary,
               borderRadius: '4px',
@@ -502,37 +443,34 @@ export default function HolidayNutritionPlanner() {
       <div style={{
         maxWidth: '900px',
         margin: '0 auto',
-        padding: '40px 20px',
+        padding: '0 20px 40px',
         position: 'relative',
-        zIndex: 1,
-        width: '100%',
-        boxSizing: 'border-box',
-        overflowX: 'hidden'
+        zIndex: 1
       }}>
         {step === 1 && (
           <div className="card-enter" style={{
             background: 'white',
             borderRadius: '16px',
-            padding: '48px',
+            padding: 'clamp(24px, 5vw, 48px)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
             border: `2px solid ${colors.primary}40`
           }}>
             <h1 style={{
-              fontSize: '48px',
+              fontSize: 'clamp(32px, 6vw, 48px)',
               margin: '0 0 12px 0',
               color: 'black',
               letterSpacing: '1px'
             }}>
-              ATHLETE PROFILE
+              PERSONAL PROFILE
             </h1>
             <p style={{
-              fontSize: '18px',
-              color: 'black',
+              fontSize: 'clamp(16px, 3vw, 18px)',
+              color: colors.steel,
               marginBottom: '36px',
               fontFamily: 'Inter, sans-serif',
               fontWeight: '500'
             }}>
-              Let's build your personalized holiday nutrition strategy
+              Build a personalized nutrition plan optimized for performance and body composition
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -547,52 +485,31 @@ export default function HolidayNutritionPlanner() {
                 }}>
                   GENDER
                 </label>
-                <select
-                  value={formData.gender}
-                  onChange={(e) => updateFormData('gender', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    fontSize: '18px',
-                    border: `2px solid ${colors.primary}40`,
-                    borderRadius: '8px',
-                    fontFamily: 'Inter, sans-serif',
-                    background: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="">Select gender...</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  fontSize: '16px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: '600',
-                  color: colors.charcoal
-                }}>
-                  AGE
-                </label>
-                <input
-                  type="number"
-                  value={formData.age}
-                  onChange={(e) => updateFormData('age', e.target.value)}
-                  placeholder="e.g., 45"
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    fontSize: '18px',
-                    border: `2px solid ${colors.primary}40`,
-                    borderRadius: '8px',
-                    fontFamily: 'Inter, sans-serif',
-                    transition: 'all 0.2s'
-                  }}
-                />
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  {['male', 'female'].map(g => (
+                    <button
+                      key={g}
+                      onClick={() => updateFormData('gender', g)}
+                      style={{
+                        flex: 1,
+                        padding: '16px',
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        background: formData.gender === g ? colors.primary : 'white',
+                        color: formData.gender === g ? 'white' : colors.charcoal,
+                        border: `2px solid ${formData.gender === g ? colors.primary : '#ddd'}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px',
+                        transition: 'all 0.2s',
+                        fontFamily: 'Inter, sans-serif'
+                      }}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -605,13 +522,13 @@ export default function HolidayNutritionPlanner() {
                     fontWeight: '600',
                     color: colors.charcoal
                   }}>
-                    WEIGHT (lbs)
+                    AGE
                   </label>
                   <input
                     type="number"
-                    value={formData.currentWeight}
-                    onChange={(e) => updateFormData('currentWeight', e.target.value)}
-                    placeholder="e.g., 155"
+                    value={formData.age}
+                    onChange={(e) => updateFormData('age', e.target.value)}
+                    placeholder="e.g., 45"
                     style={{
                       width: '100%',
                       padding: '16px',
@@ -631,13 +548,42 @@ export default function HolidayNutritionPlanner() {
                     fontWeight: '600',
                     color: colors.charcoal
                   }}>
+                    CURRENT WEIGHT (lbs)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.currentWeight}
+                    onChange={(e) => updateFormData('currentWeight', e.target.value)}
+                    placeholder="e.g., 220"
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      fontSize: '18px',
+                      border: `2px solid ${colors.primary}40`,
+                      borderRadius: '8px',
+                      fontFamily: 'Inter, sans-serif'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    fontSize: '16px',
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: '600',
+                    color: colors.charcoal
+                  }}>
                     HEIGHT (inches)
                   </label>
                   <input
                     type="number"
                     value={formData.height}
                     onChange={(e) => updateFormData('height', e.target.value)}
-                    placeholder="e.g., 67"
+                    placeholder="e.g., 70"
                     style={{
                       width: '100%',
                       padding: '16px',
@@ -648,14 +594,86 @@ export default function HolidayNutritionPlanner() {
                     }}
                   />
                   <div style={{
-                    marginTop: '4px',
-                    fontSize: '12px',
+                    marginTop: '8px',
+                    fontSize: '14px',
                     color: 'black',
                     fontFamily: 'Inter, sans-serif',
                     opacity: 0.7
                   }}>
-                    (5'7" = 67 inches)
+                    5'10" = 70 inches
                   </div>
+                </div>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    fontSize: '16px',
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: '600',
+                    color: colors.charcoal
+                  }}>
+                    TARGET RACE WEIGHT (lbs)
+                  </label>
+                  <input
+                    type="number"
+                    value={formData.targetWeight}
+                    onChange={(e) => updateFormData('targetWeight', e.target.value)}
+                    placeholder="e.g., 185"
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      fontSize: '18px',
+                      border: `2px solid ${colors.primary}40`,
+                      borderRadius: '8px',
+                      fontFamily: 'Inter, sans-serif'
+                    }}
+                  />
+                  <div style={{
+                    marginTop: '8px',
+                    fontSize: '14px',
+                    color: 'black',
+                    fontFamily: 'Inter, sans-serif',
+                    opacity: 0.7
+                  }}>
+                    Optional - leave blank if maintaining
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  fontSize: '16px',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: '600',
+                  color: colors.charcoal
+                }}>
+                  TARGET RACE DATE (optional)
+                </label>
+                <input
+                  type="date"
+                  value={formData.raceDate}
+                  onChange={(e) => updateFormData('raceDate', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    fontSize: '18px',
+                    border: `2px solid ${colors.primary}40`,
+                    borderRadius: '8px',
+                    fontFamily: 'Inter, sans-serif',
+                    background: 'white',
+                    cursor: 'pointer'
+                  }}
+                />
+                <div style={{
+                  marginTop: '8px',
+                  fontSize: '14px',
+                  color: 'black',
+                  fontFamily: 'Inter, sans-serif',
+                  opacity: 0.7
+                }}>
+                  Projected race weight will be calculated based on selected nutrition strategy
                 </div>
               </div>
 
@@ -685,38 +703,69 @@ export default function HolidayNutritionPlanner() {
                   }}
                 >
                   <option value="">Select your sport...</option>
-                  <option value="triathlon">Triathlon (All Distances)</option>
-                  <option value="running">Running (Marathon/Ultra)</option>
-                  <option value="cycling">Cycling (Road/Gravel)</option>
-                  <option value="swimming">Swimming (Open Water)</option>
-                  <option value="multisport">Multi-Sport Athlete</option>
+                  <option value="triathlon">Triathlon (Sprint - Ironman)</option>
+                  <option value="running">Running (5K - Ultra)</option>
+                  <option value="cycling">Cycling / Gravel</option>
+                  <option value="swimming">Open Water Swimming</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  fontSize: '16px',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: '600',
+                  color: colors.charcoal
+                }}>
+                  RACING GOAL
+                </label>
+                <select
+                  value={formData.goal}
+                  onChange={(e) => updateFormData('goal', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    fontSize: '18px',
+                    border: `2px solid ${colors.primary}40`,
+                    borderRadius: '8px',
+                    fontFamily: 'Inter, sans-serif',
+                    background: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">Select your goal...</option>
+                  <option value="pr-race">PR at major race (A-race)</option>
+                  <option value="age-group">Age Group podium</option>
+                  <option value="qualify">Qualify for championships (Boston, Kona, etc.)</option>
+                  <option value="complete">Complete first long-distance event</option>
+                  <option value="faster">Get faster than previous season</option>
                 </select>
               </div>
             </div>
 
             <button
               onClick={nextStep}
-              disabled={!formData.gender || !formData.age || !formData.sport || !formData.currentWeight || !formData.height}
+              disabled={!formData.gender || !formData.age || !formData.currentWeight || !formData.height || !formData.sport || !formData.goal}
               style={{
-                marginTop: '36px',
                 width: '100%',
-                padding: '16px',
+                marginTop: '36px',
+                padding: '18px',
                 fontSize: '18px',
                 fontWeight: 'bold',
-                background: formData.gender && formData.age && formData.sport && formData.currentWeight && formData.height
+                background: (formData.gender && formData.age && formData.currentWeight && formData.height && formData.sport && formData.goal)
                   ? colors.primary
                   : '#cccccc',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
-                cursor: formData.gender && formData.age && formData.sport && formData.currentWeight && formData.height ? 'pointer' : 'not-allowed',
-                transition: 'all 0.2s',
-                boxShadow: formData.gender && formData.age && formData.sport && formData.currentWeight && formData.height
-                  ? `0 6px 20px ${colors.primary}60`
+                cursor: (formData.gender && formData.age && formData.currentWeight && formData.height && formData.sport && formData.goal) ? 'pointer' : 'not-allowed',
+                boxShadow: (formData.gender && formData.age && formData.currentWeight && formData.height && formData.sport && formData.goal)
+                  ? `0 8px 24px ${colors.primary}60`
                   : 'none',
                 letterSpacing: '0.5px',
-                whiteSpace: 'nowrap',
-                boxSizing: 'border-box'
+                transition: 'all 0.2s'
               }}
             >
               CONTINUE →
@@ -728,12 +777,12 @@ export default function HolidayNutritionPlanner() {
           <div className="card-enter" style={{
             background: 'white',
             borderRadius: '16px',
-            padding: '48px',
+            padding: 'clamp(24px, 5vw, 48px)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
             border: `2px solid ${colors.primary}40`
           }}>
             <h1 style={{
-              fontSize: '48px',
+              fontSize: 'clamp(32px, 6vw, 48px)',
               margin: '0 0 12px 0',
               color: 'black',
               letterSpacing: '1px'
@@ -741,13 +790,13 @@ export default function HolidayNutritionPlanner() {
               TRAINING SCHEDULE
             </h1>
             <p style={{
-              fontSize: '18px',
+              fontSize: 'clamp(16px, 3vw, 18px)',
               color: colors.steel,
               marginBottom: '36px',
               fontFamily: 'Inter, sans-serif',
               fontWeight: '500'
             }}>
-              To customize your Holiday Nutrition Plan, help us understand your December training schedule
+              Training volume and schedule determine daily caloric needs
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -760,7 +809,7 @@ export default function HolidayNutritionPlanner() {
                   fontWeight: '600',
                   color: colors.charcoal
                 }}>
-                  WEEKLY TRAINING HOURS IN DECEMBER
+                  WEEKLY TRAINING HOURS
                 </label>
                 <input
                   type="number"
@@ -800,7 +849,7 @@ export default function HolidayNutritionPlanner() {
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                    <label key={day} className="checkbox-wrapper" style={{
+                    <label key={day} style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '12px',
@@ -821,6 +870,7 @@ export default function HolidayNutritionPlanner() {
                             updateFormData('trainingDays', formData.trainingDays.filter(d => d !== day));
                           }
                         }}
+                        style={{ cursor: 'pointer' }}
                       />
                       <span style={{
                         fontFamily: 'Inter, sans-serif',
@@ -842,7 +892,7 @@ export default function HolidayNutritionPlanner() {
                   fontWeight: '600',
                   color: colors.charcoal
                 }}>
-                  HOLIDAY EVENTS/PARTIES IN DECEMBER
+                  HOLIDAY EVENTS/PARTIES THIS MONTH
                 </label>
                 <select
                   value={formData.holidayEvents}
@@ -867,23 +917,20 @@ export default function HolidayNutritionPlanner() {
               </div>
             </div>
 
-            <div style={{ marginTop: '36px', display: 'flex', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+            <div style={{ marginTop: '36px', display: 'flex', gap: '12px' }}>
               <button
                 onClick={prevStep}
                 style={{
                   flex: 1,
-                  padding: '16px 8px',
-                  fontSize: '16px',
+                  padding: '18px',
+                  fontSize: '18px',
                   fontWeight: 'bold',
                   background: 'white',
                   color: colors.steel,
                   border: `2px solid ${colors.steel}`,
                   borderRadius: '12px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  letterSpacing: '0.5px',
-                  whiteSpace: 'nowrap',
-                  boxSizing: 'border-box'
+                  letterSpacing: '0.5px'
                 }}
               >
                 ← BACK
@@ -893,23 +940,21 @@ export default function HolidayNutritionPlanner() {
                 disabled={!formData.weeklyHours || formData.trainingDays.length === 0 || !formData.holidayEvents}
                 style={{
                   flex: 2,
-                  padding: '16px 8px',
-                  fontSize: '16px',
+                  padding: '18px',
+                  fontSize: '18px',
                   fontWeight: 'bold',
-                  background: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents
+                  background: (formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents)
                     ? colors.primary
                     : '#cccccc',
                   color: 'white',
                   border: 'none',
                   borderRadius: '12px',
-                  cursor: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s',
-                  boxShadow: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents
-                    ? `0 6px 20px ${colors.primary}60`
+                  cursor: (formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents) ? 'pointer' : 'not-allowed',
+                  boxShadow: (formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents)
+                    ? `0 8px 24px ${colors.primary}60`
                     : 'none',
                   letterSpacing: '0.5px',
-                  whiteSpace: 'nowrap',
-                  boxSizing: 'border-box'
+                  transition: 'all 0.2s'
                 }}
               >
                 CONTINUE →
@@ -918,179 +963,430 @@ export default function HolidayNutritionPlanner() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 3 && formData.currentWeight && formData.targetWeight && (
           <div className="card-enter" style={{
             background: 'white',
             borderRadius: '16px',
-            padding: '48px',
+            padding: 'clamp(24px, 5vw, 48px)',
             boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
             border: `2px solid ${colors.primary}40`
           }}>
             <h1 style={{
-              fontSize: '48px',
+              fontSize: 'clamp(32px, 6vw, 48px)',
               margin: '0 0 12px 0',
               color: 'black',
               letterSpacing: '1px'
             }}>
-              2026 GOALS
+              ⚖️ NUTRITION STRATEGY
             </h1>
+            
             <p style={{
-              fontSize: '18px',
-              color: colors.steel,
-              marginBottom: '36px',
-              fontFamily: 'Inter, sans-serif',
-              fontWeight: '500'
+              fontSize: '16px',
+              color: '#666',
+              marginBottom: '32px',
+              lineHeight: '1.6'
             }}>
-              What are you racing towards?
+              {(() => {
+                const rec = getWeightLossRecommendation();
+                const weightToLose = rec.weightToLose;
+                if (weightToLose <= 0) {
+                  return `Target weight (${formData.targetWeight} lbs) is at or above current weight (${formData.currentWeight} lbs). Maintenance calories will be calculated.`;
+                } else {
+                  return `To optimize performance and body composition for race day, a ${Math.round(weightToLose)}-pound reduction has been identified (${formData.currentWeight} → ${formData.targetWeight} lbs). A sustainable nutrition strategy will preserve lean mass while achieving the target weight.`;
+                }
+              })()}
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  fontSize: '16px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: '600',
-                  color: colors.charcoal
-                }}>
-                  PRIMARY 2026 GOAL
-                </label>
-                <select
-                  value={formData.goal}
-                  onChange={(e) => updateFormData('goal', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    fontSize: '18px',
+            {/* Smart Recommendation Box */}
+            {(() => {
+              const rec = getWeightLossRecommendation();
+              if (rec.weightToLose > 0) {
+                return (
+                  <div style={{
+                    background: `${colors.primary}10`,
                     border: `2px solid ${colors.primary}40`,
-                    borderRadius: '8px',
-                    fontFamily: 'Inter, sans-serif',
-                    background: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="">Select your goal...</option>
-                  <option value="pr-race">PR at major race (A-race)</option>
-                  <option value="age-group">Age Group podium</option>
-                  <option value="qualify">Qualify for championships (Boston, Kona, etc.)</option>
-                  <option value="complete">Complete first long-distance event</option>
-                  <option value="faster">Simply get faster than 2025</option>
-                </select>
-              </div>
+                    borderRadius: '12px',
+                    padding: '24px',
+                    marginBottom: '32px'
+                  }}>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: colors.primary, marginBottom: '12px' }}>
+                      💡 SUGGESTED APPROACH
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: '800', color: colors.charcoal, marginBottom: '8px' }}>
+                      {rec.recommendedRate === '0.5' ? '0.5 lb/week' :
+                       rec.recommendedRate === '1.0' ? '1 lb/week' :
+                       rec.recommendedRate === '1.5' ? '1.5 lb/week' :
+                       rec.recommendedRate === '2.0' ? '2 lb/week' : 'Maintain Weight'}
+                    </div>
+                    <div style={{ fontSize: '15px', color: '#555', lineHeight: '1.6', marginBottom: '12px' }}>
+                      {rec.reasoning}
+                    </div>
+                    {rec.warnings.length > 0 && (
+                      <div style={{ marginTop: '12px' }}>
+                        {rec.warnings.map((warning, idx) => (
+                          <div key={idx} style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>
+                            {warning}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
-              <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  fontSize: '16px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: '600',
-                  color: colors.charcoal
-                }}>
-                  TARGET RACE WEIGHT (lbs) - OPTIONAL
-                </label>
-                <input
-                  type="number"
-                  value={formData.targetWeight}
-                  onChange={(e) => updateFormData('targetWeight', e.target.value)}
-                  placeholder="Leave blank if not applicable"
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    fontSize: '18px',
-                    border: `2px solid ${colors.primary}40`,
-                    borderRadius: '8px',
-                    fontFamily: 'Inter, sans-serif'
-                  }}
-                />
-                <div style={{
-                  marginTop: '8px',
-                  fontSize: '14px',
-                  color: 'black',
-                  fontFamily: 'Inter, sans-serif',
-                  opacity: 0.8
-                }}>
-                  If body composition is part of your strategy
-                </div>
+            {/* Weight Loss Rate Selection */}
+            <div style={{ marginBottom: '32px' }}>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: colors.charcoal, marginBottom: '16px' }}>
+                Select Nutrition Strategy:
               </div>
-
-              <div style={{
-                padding: '20px',
-                background: colors.teal + '20',
-                borderRadius: '12px',
-                border: `2px solid ${colors.teal}60`
-              }}>
-                <div style={{
-                  fontSize: '18px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: '600',
-                  color: 'black',
-                  marginBottom: '12px'
-                }}>
-                  ENDURANCE ATHLETE INSIGHT
-                </div>
-                <div style={{
-                  fontSize: '15px',
-                  fontFamily: 'Inter, sans-serif',
-                  color: 'black',
-                  lineHeight: '1.6',
-                  opacity: 0.9
-                }}>
-                  Your December nutrition choices have compounding effects. Maintain lean mass now = faster spring build. Strategic holiday fueling = metabolic flexibility. This planner will show you how.
-                </div>
+              
+              <div style={{ display: 'grid', gap: '16px' }}>
+                {[
+                  { rate: 'maintain', label: 'Maintain Weight', deficit: '0 cal/day', description: 'Maintain current weight' },
+                  { rate: '0.5', label: '0.5 lb/week', deficit: '250 cal/day', description: 'Maximum muscle preservation' },
+                  { rate: '1.0', label: '1 lb/week', deficit: '500 cal/day', description: 'Sustainable fat loss' },
+                  { rate: '1.5', label: '1.5 lb/week', deficit: '750 cal/day', description: 'Moderate approach for most athletes' },
+                  { rate: '2.0', label: '2 lb/week', deficit: '1000 cal/day', description: 'Aggressive - requires close monitoring' }
+                ].map(({rate, label, deficit, description}) => (
+                  <div
+                    key={rate}
+                    onClick={() => updateFormData('weightLossRate', rate)}
+                    style={{
+                      padding: '20px',
+                      border: `3px solid ${formData.weightLossRate === rate ? colors.primary : '#ddd'}`,
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      background: formData.weightLossRate === rate ? `${colors.primary}08` : 'white',
+                      position: 'relative'
+                    }}
+                  >
+                    {formData.weightLossRate === rate && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: colors.primary,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontSize: '14px',
+                        fontWeight: 'bold'
+                      }}>
+                        ✓
+                      </div>
+                    )}
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: colors.charcoal, marginBottom: '4px' }}>
+                      {label}
+                    </div>
+                    <div style={{ fontSize: '14px', color: colors.primary, fontWeight: '600', marginBottom: '8px' }}>
+                      {deficit} deficit
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.5' }}>
+                      {description}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div style={{ marginTop: '36px', display: 'flex', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+            {/* Safety Warnings */}
+            {formData.weightLossRate && getSafetyWarning(formData.weightLossRate).length > 0 && (
+              <div style={{ marginBottom: '24px' }}>
+                {getSafetyWarning(formData.weightLossRate).map((warning, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: warning.type === 'danger' ? '#fff5f5' : '#fffbeb',
+                      border: `2px solid ${warning.type === 'danger' ? '#feb2b2' : '#fcd34d'}`,
+                      borderRadius: '8px',
+                      padding: '16px',
+                      marginBottom: '12px'
+                    }}
+                  >
+                    <div style={{ fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
+                      {warning.message}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Timeline Projection */}
+            {formData.weightLossRate && formData.weightLossRate !== 'maintain' && (() => {
+              const weightToLose = parseFloat(formData.currentWeight) - parseFloat(formData.targetWeight);
+              const weeklyLoss = parseFloat(formData.weightLossRate);
+              const weeks = Math.ceil(weightToLose / weeklyLoss);
+              const months = Math.round(weeks / 4.33);
+              const goalDate = new Date();
+              goalDate.setDate(goalDate.getDate() + (weeks * 7));
+              const goalDateStr = goalDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+              
+              // Race date projection
+              let raceProjection = null;
+              if (formData.raceDate) {
+                const raceDate = new Date(formData.raceDate);
+                const today = new Date();
+                const timeDiff = raceDate - today;
+                const weeksToRace = Math.floor(timeDiff / (7 * 24 * 60 * 60 * 1000));
+                
+                if (weeksToRace > 0) {
+                  const projectedLoss = weeklyLoss * weeksToRace;
+                  const projectedRaceWeight = parseFloat(formData.currentWeight) - projectedLoss;
+                  const gap = projectedRaceWeight - parseFloat(formData.targetWeight);
+                  
+                  raceProjection = {
+                    weeksToRace,
+                    projectedRaceWeight: projectedRaceWeight.toFixed(1),
+                    gap: gap.toFixed(1),
+                    raceDateStr: raceDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                  };
+                }
+              }
+              
+              return (
+                <>
+                  <div style={{
+                    background: '#f0fdf4',
+                    border: '2px solid #86efac',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    marginBottom: '24px'
+                  }}>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: '#166534', marginBottom: '12px' }}>
+                      📅 TIMELINE TO GOAL WEIGHT
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#555', lineHeight: '1.8' }}>
+                      <div>Expected weekly loss: <strong>{weeklyLoss} lb/week</strong></div>
+                      <div>Time to goal weight: <strong>{weeks} weeks</strong> (~{months} months)</div>
+                      <div>Estimated arrival: <strong>{goalDateStr}</strong></div>
+                    </div>
+                  </div>
+                  
+                  {raceProjection && (
+                    <div style={{
+                      background: raceProjection.gap > 10 ? '#fff5f5' : raceProjection.gap < -5 ? '#fffbeb' : '#f0f9ff',
+                      border: `2px solid ${raceProjection.gap > 10 ? '#feb2b2' : raceProjection.gap < -5 ? '#fcd34d' : '#93c5fd'}`,
+                      borderRadius: '12px',
+                      padding: '20px',
+                      marginBottom: '24px'
+                    }}>
+                      <div style={{ 
+                        fontSize: '16px', 
+                        fontWeight: '700', 
+                        color: raceProjection.gap > 10 ? '#991b1b' : raceProjection.gap < -5 ? '#92400e' : '#1e40af',
+                        marginBottom: '12px' 
+                      }}>
+                        🏁 RACE DAY PROJECTION
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#555', lineHeight: '1.8' }}>
+                        <div>Race date: <strong>{raceProjection.raceDateStr}</strong></div>
+                        <div>Weeks to race: <strong>{raceProjection.weeksToRace} weeks</strong></div>
+                        <div>Projected race weight: <strong>{raceProjection.projectedRaceWeight} lbs</strong></div>
+                        <div>Goal weight: <strong>{formData.targetWeight} lbs</strong></div>
+                        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #00000020' }}>
+                          {Math.abs(parseFloat(raceProjection.gap)) < 3 ? (
+                            <span style={{ color: '#166534', fontWeight: '600' }}>
+                              ✅ This strategy aligns well with the race timeline
+                            </span>
+                          ) : parseFloat(raceProjection.gap) > 0 ? (
+                            <span style={{ color: '#991b1b', fontWeight: '600' }}>
+                              ⚠️ Projected to be {raceProjection.gap} lbs above goal on race day. Consider increasing weekly rate or adjusting goal weight.
+                            </span>
+                          ) : (
+                            <span style={{ color: '#92400e', fontWeight: '600' }}>
+                              ⚠️ Projected to be {Math.abs(raceProjection.gap)} lbs below goal on race day. Consider decreasing weekly rate to avoid excessive loss.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Navigation Buttons */}
+            <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
               <button
-                onClick={prevStep}
+                onClick={() => setStep(2)}
                 style={{
                   flex: 1,
-                  padding: '16px 8px',
-                  fontSize: '16px',
+                  padding: '18px',
+                  fontSize: '18px',
                   fontWeight: 'bold',
                   background: 'white',
-                  color: colors.steel,
-                  border: `2px solid ${colors.steel}`,
+                  color: colors.charcoal,
+                  border: `2px solid ${colors.charcoal}`,
                   borderRadius: '12px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  letterSpacing: '0.5px',
-                  whiteSpace: 'nowrap',
-                  boxSizing: 'border-box'
+                  letterSpacing: '0.5px'
                 }}
               >
                 ← BACK
               </button>
               <button
                 onClick={nextStep}
-                disabled={!formData.goal}
+                disabled={!formData.weightLossRate}
                 style={{
                   flex: 2,
-                  padding: '16px 8px',
-                  fontSize: '16px',
+                  padding: '18px',
+                  fontSize: '18px',
                   fontWeight: 'bold',
-                  background: formData.goal ? colors.primary : '#cccccc',
+                  background: formData.weightLossRate ? colors.primary : '#ccc',
                   color: 'white',
                   border: 'none',
                   borderRadius: '12px',
-                  cursor: formData.goal ? 'pointer' : 'not-allowed',
-                  transition: 'all 0.2s',
-                  boxShadow: formData.goal ? `0 6px 20px ${colors.primary}60` : 'none',
+                  cursor: formData.weightLossRate ? 'pointer' : 'not-allowed',
+                  boxShadow: formData.weightLossRate ? `0 8px 24px ${colors.primary}60` : 'none',
                   letterSpacing: '0.5px',
-                  whiteSpace: 'nowrap',
-                  boxSizing: 'border-box'
+                  transition: 'all 0.2s'
                 }}
               >
-                GET MY PLAN →
+                CONTINUE →
               </button>
             </div>
           </div>
         )}
 
-        {step === 4 && results && (() => {
-          // Helper function to format sport name
+        {step === 3 && (!formData.currentWeight || !formData.targetWeight) && (
+          <div className="card-enter" style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: '48px',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+            border: `2px solid ${colors.primary}40`,
+            textAlign: 'center'
+          }}>
+            <h2 style={{ color: colors.primary, marginBottom: '16px' }}>Missing Information</h2>
+            <p style={{ fontSize: '16px', color: '#666', marginBottom: '24px' }}>
+              Current weight and target weight are required to calculate nutrition strategy.
+            </p>
+            <button
+              onClick={() => setStep(1)}
+              style={{
+                padding: '16px 32px',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                background: colors.primary,
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                boxShadow: `0 8px 24px ${colors.primary}60`
+              }}
+            >
+              ← GO BACK TO STEP 1
+            </button>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="card-enter" style={{
+            background: 'white',
+            borderRadius: '16px',
+            padding: 'clamp(24px, 5vw, 48px)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+            border: `2px solid ${colors.primary}40`
+          }}>
+            <h1 style={{
+              fontSize: 'clamp(32px, 6vw, 48px)',
+              margin: '0 0 12px 0',
+              color: 'black',
+              letterSpacing: '1px'
+            }}>
+              CONFIRM & CALCULATE
+            </h1>
+            <p style={{
+              fontSize: 'clamp(16px, 3vw, 18px)',
+              color: colors.steel,
+              marginBottom: '36px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: '500'
+            }}>
+              Review details and generate personalized nutrition plan
+            </p>
+
+            <div style={{
+              background: `${colors.primary}08`,
+              border: `2px solid ${colors.primary}40`,
+              borderRadius: '12px',
+              padding: '24px',
+              marginBottom: '32px'
+            }}>
+              <h3 style={{ 
+                fontSize: '20px', 
+                color: colors.charcoal, 
+                marginBottom: '16px',
+                fontWeight: '700'
+              }}>
+                Summary
+              </h3>
+              <div style={{ fontSize: '15px', color: '#555', lineHeight: '2' }}>
+                <div><strong>Profile:</strong> {formData.gender === 'male' ? 'Male' : 'Female'}, {formData.age} years old</div>
+                <div><strong>Current Weight:</strong> {formData.currentWeight} lbs</div>
+                {formData.targetWeight && <div><strong>Target Weight:</strong> {formData.targetWeight} lbs</div>}
+                {formData.raceDate && <div><strong>Race Date:</strong> {new Date(formData.raceDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</div>}
+                <div><strong>Height:</strong> {formData.height} inches</div>
+                <div><strong>Weekly Training:</strong> {formData.weeklyHours} hours</div>
+                <div><strong>Training Days:</strong> {formData.trainingDays.length} days/week</div>
+                {formData.weightLossRate && formData.weightLossRate !== 'maintain' && (
+                  <div><strong>Strategy:</strong> {formData.weightLossRate} lb/week</div>
+                )}
+                {formData.weightLossRate === 'maintain' && (
+                  <div><strong>Strategy:</strong> Maintenance</div>
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <button
+                onClick={() => setStep(3)}
+                style={{
+                  flex: 1,
+                  padding: '18px',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  background: 'white',
+                  color: colors.charcoal,
+                  border: `2px solid ${colors.charcoal}`,
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                ← BACK
+              </button>
+              <button
+                onClick={nextStep}
+                style={{
+                  flex: 2,
+                  padding: '18px',
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  background: colors.primary,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  boxShadow: `0 8px 24px ${colors.primary}60`,
+                  letterSpacing: '0.5px',
+                  transition: 'all 0.2s'
+                }}
+              >
+                CALCULATE PLAN →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 5 && results && (() => {
           const formatSportName = (sport) => {
             const sportName = sport.split('(')[0].trim();
             return sportName.charAt(0).toUpperCase() + sportName.slice(1).toLowerCase();
@@ -1098,6 +1394,32 @@ export default function HolidayNutritionPlanner() {
           
           return (
           <div className="card-enter" style={{ width: '100%', maxWidth: '100%', padding: '0', margin: '0' }}>
+            {/* Start Over Button */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              marginBottom: '16px'
+            }}>
+              <button
+                onClick={resetCalculator}
+                style={{
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  background: 'white',
+                  color: colors.charcoal,
+                  border: `2px solid ${colors.charcoal}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  letterSpacing: '0.5px',
+                  transition: 'all 0.2s',
+                  fontFamily: 'Inter, sans-serif'
+                }}
+              >
+                ↻ START OVER
+              </button>
+            </div>
+
             <div style={{
               background: 'white',
               borderRadius: '16px',
@@ -1114,79 +1436,114 @@ export default function HolidayNutritionPlanner() {
                 marginBottom: '36px'
               }}>
                 <h1 style={{
-                  fontSize: '52px',
-                  margin: '0 0 12px 0',
-                  color: 'black',
-                  letterSpacing: '1px'
+                  fontSize: 'clamp(28px, 6vw, 48px)',
+                  fontWeight: '900',
+                  margin: '0 0 16px 0',
+                  color: colors.teal,
+                  letterSpacing: '2px',
+                  wordWrap: 'break-word'
                 }}>
-                  YOUR PERSONALIZED PLAN
+                  YOUR PERSONALIZED NUTRITION PLAN
                 </h1>
-                <p style={{
-                  fontSize: '20px',
-                  color: 'black',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: '500'
-                }}>
-                  Optimized for {formData.gender === 'male' ? 'Male' : 'Female'} Triathletes and Distance Runners | <span style={{ color: colors.primary, fontWeight: '700' }}>{formatSportName(formData.sport)}</span>
-                </p>
-                <p style={{
-                  fontSize: '15px',
-                  color: 'black',
-                  fontFamily: 'Inter, sans-serif',
-                  marginTop: '8px',
-                  opacity: 0.7
-                }}>
-                  Based on Mifflin-St Jeor equation • Age {formData.age} • {formData.currentWeight}lbs • {formData.height}" tall
-                </p>
-              </div>
-
-              {/* BMR Display */}
-              <div style={{
-                background: colors.steel + '15',
-                padding: '20px',
-                borderRadius: '12px',
-                marginBottom: '24px',
-                textAlign: 'center'
-              }}>
                 <div style={{
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: '14px',
-                  color: 'black',
-                  fontWeight: '600',
-                  marginBottom: '8px'
-                }}>
-                  YOUR BASAL METABOLIC RATE (BMR)
-                </div>
-                <div style={{
-                  fontSize: '32px',
-                  fontWeight: 'bold',
-                  color: 'black'
-                }}>
-                  {results.bmr} calories/day
-                </div>
-                <div style={{
-                  fontSize: '13px',
+                  fontSize: 'clamp(14px, 3vw, 18px)',
                   color: 'black',
                   fontFamily: 'Inter, sans-serif',
-                  marginTop: '4px',
-                  opacity: 0.8
+                  maxWidth: '800px',
+                  margin: '0 auto',
+                  lineHeight: '1.6',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'break-word'
                 }}>
-                  Calories burned at rest (before activity)
+                  Evidence-based nutrition strategy for {formatSportName(formData.sport)} athletes, calculated using the Mifflin-St Jeor equation with activity-adjusted TDEE
                 </div>
               </div>
 
+              {/* Race Goals Summary - NEW */}
+              {results.targetWeight > 0 && (
+                <div style={{
+                  background: `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.primary}05 100%)`,
+                  border: `3px solid ${colors.primary}`,
+                  borderRadius: '12px',
+                  padding: '24px',
+                  marginBottom: '36px'
+                }}>
+                  <div style={{
+                    fontSize: '20px',
+                    fontWeight: '800',
+                    color: colors.primary,
+                    marginBottom: '16px',
+                    letterSpacing: '1px'
+                  }}>
+                    RACE PREPARATION TARGETS
+                  </div>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '12px',
+                    fontSize: '15px',
+                    color: '#555',
+                    fontFamily: 'Inter, sans-serif',
+                    lineHeight: '1.8'
+                  }}>
+                    <div><strong>Current Weight:</strong> {results.currentWeight} lbs</div>
+                    <div><strong>Goal Weight:</strong> {results.targetWeight} lbs</div>
+                    {results.raceDate && <div><strong>Race Date:</strong> {results.raceDate}</div>}
+                    <div><strong>Strategy:</strong> {results.weightLossRate === 'maintain' ? 'Maintenance' : `${results.weightLossRate} lb/week`}</div>
+                    <div><strong>Height:</strong> {formData.height} inches</div>
+                  </div>
+                  
+                  {results.weeksToRace > 0 && results.projectedRaceWeight && (
+                    <div style={{
+                      marginTop: '20px',
+                      paddingTop: '20px',
+                      borderTop: `2px solid ${colors.primary}40`
+                    }}>
+                      <div style={{
+                        fontSize: '16px',
+                        fontWeight: '700',
+                        color: colors.charcoal,
+                        marginBottom: '12px'
+                      }}>
+                        RACE DAY PROJECTION ({results.weeksToRace} weeks)
+                      </div>
+                      <div style={{
+                        fontSize: '15px',
+                        color: '#555',
+                        lineHeight: '1.8'
+                      }}>
+                        <div>Projected race weight: <strong>{results.projectedRaceWeight.toFixed(1)} lbs</strong></div>
+                        <div>
+                          {Math.abs(results.projectedRaceWeight - results.targetWeight) < 3 ? (
+                            <span style={{ color: '#166534', fontWeight: '600' }}>
+                              ✅ Excellent alignment with goal weight
+                            </span>
+                          ) : results.projectedRaceWeight > results.targetWeight ? (
+                            <span style={{ color: '#991b1b', fontWeight: '600' }}>
+                              Gap to goal: +{(results.projectedRaceWeight - results.targetWeight).toFixed(1)} lbs
+                            </span>
+                          ) : (
+                            <span style={{ color: '#92400e', fontWeight: '600' }}>
+                              Below goal by: {(results.targetWeight - results.projectedRaceWeight).toFixed(1)} lbs
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Daily Targets */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: '12px',
-                marginBottom: '36px',
-                maxWidth: '100%',
-                width: '100%',
-                boxSizing: 'border-box'
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '20px',
+                marginBottom: '36px'
               }}>
                 {/* Training Day Card */}
                 <div className="result-card" style={{
-                  background: `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.primary}05 100%)`,
+                  background: `linear-gradient(135deg, ${colors.primary}25 0%, ${colors.primary}08 100%)`,
                   padding: '20px',
                   borderRadius: '12px',
                   border: `2px solid ${colors.primary}`,
@@ -1202,6 +1559,14 @@ export default function HolidayNutritionPlanner() {
                   }}>
                     TRAINING DAYS
                   </div>
+                  
+                  {results.training.deficit > 0 && (
+                    <div style={{ marginBottom: '16px', fontSize: '13px', color: '#666' }}>
+                      <div style={{ opacity: 0.7 }}>Maintenance: {results.training.maintenance} cal</div>
+                      <div style={{ color: colors.primary, fontWeight: '600' }}>Deficit: -{results.training.deficit} cal/day</div>
+                    </div>
+                  )}
+                  
                   <div style={{
                     fontSize: '42px',
                     fontWeight: 'bold',
@@ -1257,6 +1622,14 @@ export default function HolidayNutritionPlanner() {
                   }}>
                     REST DAYS
                   </div>
+                  
+                  {results.rest.deficit > 0 && (
+                    <div style={{ marginBottom: '16px', fontSize: '13px', color: '#666' }}>
+                      <div style={{ opacity: 0.7 }}>Maintenance: {results.rest.maintenance} cal</div>
+                      <div style={{ color: colors.primary, fontWeight: '600' }}>Deficit: -{results.rest.deficit} cal/day</div>
+                    </div>
+                  )}
+                  
                   <div style={{
                     fontSize: '42px',
                     fontWeight: 'bold',
@@ -1294,7 +1667,7 @@ export default function HolidayNutritionPlanner() {
                   </div>
                 </div>
 
-                {/* Event Day Card */}
+                {/* Party/Event Day Card */}
                 <div className="result-card" style={{
                   background: `linear-gradient(135deg, ${colors.teal}25 0%, ${colors.teal}08 100%)`,
                   padding: '20px',
@@ -1335,7 +1708,7 @@ export default function HolidayNutritionPlanner() {
                     </div>
                     <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${colors.teal}40` }}>
                       <strong>Target: ~{results.event.baseCalories} calories</strong><br/>
-                      <span style={{ fontSize: '13px', opacity: 0.8 }}>(Average of training & rest days)</span>
+                      <span style={{ fontSize: '13px', opacity: 0.8' }}>(Average of training & rest days)</span>
                     </div>
                   </div>
                 </div>
@@ -1378,25 +1751,176 @@ export default function HolidayNutritionPlanner() {
                 </div>
               </div>
 
-              {/* Key Strategies */}
+              {/* Weight Loss Projection */}
+              {results.weightLossRate && results.weightLossRate !== 'maintain' && results.weightToLose > 0 && (
+                <div style={{
+                  background: `linear-gradient(135deg, ${colors.primary}15 0%, ${colors.primary}05 100%)`,
+                  padding: '28px',
+                  borderRadius: '12px',
+                  marginBottom: '36px',
+                  border: `3px solid ${colors.primary}`,
+                  boxShadow: `0 8px 24px ${colors.primary}30`
+                }}>
+                  <div style={{
+                    fontSize: '24px',
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: '800',
+                    color: colors.primary,
+                    marginBottom: '20px',
+                    letterSpacing: '1px',
+                    textAlign: 'center'
+                  }}>
+                    📊 WEIGHT LOSS PROJECTION
+                  </div>
+                  
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                    gap: '16px',
+                    marginBottom: '20px'
+                  }}>
+                    <div style={{
+                      background: 'white',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px', fontWeight: '600' }}>
+                        WEIGHT TO LOSE
+                      </div>
+                      <div style={{ fontSize: '32px', fontWeight: '800', color: colors.charcoal }}>
+                        {Math.round(results.weightToLose)} lbs
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                        {results.currentWeight} → {results.targetWeight} lbs
+                      </div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'white',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px', fontWeight: '600' }}>
+                        WEEKLY RATE
+                      </div>
+                      <div style={{ fontSize: '32px', fontWeight: '800', color: colors.primary }}>
+                        {results.expectedWeeklyLoss.toFixed(1)} lbs
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                        {(results.weeklyDeficit / 1000).toFixed(1)}k cal deficit/week
+                      </div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'white',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px', fontWeight: '600' }}>
+                        TIME TO GOAL
+                      </div>
+                      <div style={{ fontSize: '32px', fontWeight: '800', color: colors.charcoal }}>
+                        {results.weeksToGoal} weeks
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                        ~{Math.round(results.weeksToGoal / 4.33)} months
+                      </div>
+                    </div>
+                    
+                    <div style={{
+                      background: 'white',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '13px', color: '#666', marginBottom: '4px', fontWeight: '600' }}>
+                        GOAL DATE
+                      </div>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: colors.charcoal, lineHeight: '1.3' }}>
+                        {results.goalDate}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+                        Estimated arrival
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Safety Status */}
+                  <div style={{
+                    background: results.hitMinimumTraining || results.hitMinimumRest ? '#fff5f5' : '#f0fdf4',
+                    border: `2px solid ${results.hitMinimumTraining || results.hitMinimumRest ? '#feb2b2' : '#86efac'}`,
+                    borderRadius: '8px',
+                    padding: '16px',
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ 
+                      fontSize: '18px', 
+                      fontWeight: '700', 
+                      color: results.hitMinimumTraining || results.hitMinimumRest ? '#991b1b' : '#166534',
+                      marginBottom: '8px' 
+                    }}>
+                      {results.hitMinimumTraining || results.hitMinimumRest ? '⚠️ SAFETY LIMIT REACHED' : '✅ SAFE & SUSTAINABLE PLAN'}
+                    </div>
+                    <div style={{ fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
+                      {results.hitMinimumTraining || results.hitMinimumRest ? (
+                        <>Calorie targets are at recommended minimums for health and performance. Close monitoring of energy levels, recovery, and training quality is essential. Consider reducing deficit if experiencing fatigue, illness, or performance decline.</>
+                      ) : (
+                        <>This nutrition strategy is sustainable and safe for the identified training volume. It preserves muscle mass, maintains performance, and supports goal achievement without compromising health or recovery.</>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Maintenance Message */}
+              {results.weightLossRate === 'maintain' && (
+                <div style={{
+                  background: `linear-gradient(135deg, ${colors.teal}15 0%, ${colors.teal}05 100%)`,
+                  padding: '24px',
+                  borderRadius: '12px',
+                  marginBottom: '36px',
+                  border: `2px solid ${colors.teal}`,
+                  textAlign: 'center'
+                }}>
+                  <div style={{
+                    fontSize: '20px',
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: '700',
+                    color: colors.teal,
+                    marginBottom: '12px'
+                  }}>
+                    ⚖️ MAINTENANCE PLAN
+                  </div>
+                  <div style={{
+                    fontSize: '15px',
+                    color: '#555',
+                    lineHeight: '1.6',
+                    fontFamily: 'Inter, sans-serif'
+                  }}>
+                    This plan maintains current weight of <strong>{results.currentWeight} lbs</strong>. Calories are calculated to support training volume while preserving body composition through the season.
+                  </div>
+                </div>
+              )}
+
+              {/* Implementation Strategy */}
               <div style={{
                 background: 'white',
                 padding: '20px',
                 borderRadius: '12px',
                 marginBottom: '36px',
-                border: `2px solid ${colors.primary}`,
-                width: '100%',
-                boxSizing: 'border-box'
+                border: `2px solid ${colors.primary}`
               }}>
                 <h2 style={{
                   fontSize: '24px',
                   color: colors.primary,
                   marginBottom: '20px',
                   letterSpacing: '1px',
-                  wordWrap: 'break-word',
                   textAlign: 'center'
                 }}>
-                  YOUR DECEMBER STRATEGY
+                  IMPLEMENTATION STRATEGY
                 </h2>
                 <div style={{
                   display: 'grid',
@@ -1407,50 +1931,47 @@ export default function HolidayNutritionPlanner() {
                   color: 'black',
                   lineHeight: '1.6'
                 }}>
-                  <div style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  <div>
                     <div style={{ color: colors.primary, fontWeight: 'bold', marginBottom: '8px', fontSize: '15px' }}>
                       PROTEIN PRIORITY
                     </div>
-                    Hit {results.training.protein}g daily. {formData.gender === 'female' ? '2.0' : '2.2'}g/kg for {formData.gender === 'male' ? 'male' : 'female'} athletes. Essential for muscle preservation.
+                    Target {results.training.protein}g daily. 2.0g/kg body weight for athletes. Essential for muscle preservation during training and caloric deficit.
                   </div>
-                  <div style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  <div>
                     <div style={{ color: colors.primary, fontWeight: 'bold', marginBottom: '8px', fontSize: '15px' }}>
                       CARB CYCLING
                     </div>
-                    Higher carbs ({results.training.carbs}g) on training days. Reduce to {results.rest.carbs}g on rest days. Matches energy demands.
+                    Higher carbs ({results.training.carbs}g) on training days. Reduced to {results.rest.carbs}g on rest days. Matches energy demands to activity level.
                   </div>
-                  <div style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  <div>
                     <div style={{ color: colors.primary, fontWeight: 'bold', marginBottom: '8px', fontSize: '15px' }}>
-                      TIMING MATTERS
+                      NUTRIENT TIMING
                     </div>
-                    Pre-workout: simple carbs. Post-workout (30min): protein + carbs for recovery. Events: eat strategic meal before arriving.
+                    Pre-workout: simple carbs 30-60 min before. Post-workout (within 30 min): protein + carbs for optimal recovery. Events: strategic meal before arriving.
                   </div>
-                  <div style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                  <div>
                     <div style={{ color: colors.primary, fontWeight: 'bold', marginBottom: '8px', fontSize: '15px' }}>
-                      STAY STRONG
+                      STRENGTH MAINTENANCE
                     </div>
-                    Maintain strength training 2x/week minimum. Weight room work = race speed. Critical during off-season.
+                    Maintain strength training 2x/week minimum during off-season. Resistance work supports race speed and muscle preservation.
                   </div>
                 </div>
               </div>
 
-              {/* Gender-Specific Notes */}
+              {/* Athlete Considerations */}
               <div style={{
                 background: `linear-gradient(135deg, ${colors.teal}20 0%, ${colors.teal}10 100%)`,
                 padding: '20px',
                 borderRadius: '12px',
                 border: `2px solid ${colors.teal}60`,
-                marginBottom: '24px',
-                width: '100%',
-                boxSizing: 'border-box'
+                marginBottom: '24px'
               }}>
                 <h3 style={{
                   fontSize: '18px',
                   color: 'black',
                   marginBottom: '12px',
                   fontFamily: 'Inter, sans-serif',
-                  fontWeight: '700',
-                  wordWrap: 'break-word'
+                  fontWeight: '700'
                 }}>
                   {formData.gender === 'male' ? 'Male Athlete Considerations' : 'Female Athlete Considerations'}
                 </h3>
@@ -1458,45 +1979,40 @@ export default function HolidayNutritionPlanner() {
                   fontFamily: 'Inter, sans-serif',
                   fontSize: '14px',
                   color: 'black',
-                  lineHeight: '1.7',
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word'
+                  lineHeight: '1.7'
                 }}>
                   {formData.gender === 'male' ? (
                     <>
                       • <strong>Higher calorie needs</strong> due to larger muscle mass and metabolic rate<br/>
-                      • <strong>Protein: {results.training.protein}g/day</strong> (2.2g/kg) maintains muscle during reduced training<br/>
-                      • <strong>Post-peak age testosterone decline</strong> makes nutrition timing even more critical<br/>
-                      • Focus on zinc, magnesium, vitamin D for hormonal health
+                      • <strong>Protein: {results.training.protein}g/day</strong> (2.0g/kg) maintains muscle during reduced training<br/>
+                      • <strong>Hormonal health</strong> - adequate calorie intake supports testosterone production<br/>
+                      • Focus on zinc, magnesium, vitamin D for optimal hormonal function
                     </>
                   ) : (
                     <>
-                      • <strong>Moderate calorie approach</strong> optimized for female physiology<br/>
+                      • <strong>Calorie approach</strong> optimized for female physiology and hormonal fluctuation<br/>
                       • <strong>Protein: {results.training.protein}g/day</strong> (2.0g/kg) supports lean mass<br/>
                       • <strong>Iron-rich foods critical</strong> - include lean red meat, spinach, legumes<br/>
-                      • <strong>Hormonal considerations</strong> - adjust carbs based on menstrual cycle if applicable<br/>
-                      • Calcium and vitamin D priority for bone health
+                      • <strong>Hormonal considerations</strong> - carb intake may vary with menstrual cycle<br/>
+                      • Calcium and vitamin D priority for bone health and performance
                     </>
                   )}
                 </div>
               </div>
 
-              {/* Action Steps */}
+              {/* Next Steps */}
               <div style={{
                 background: `linear-gradient(135deg, ${colors.primary}20 0%, ${colors.primary}10 100%)`,
                 padding: '20px',
                 borderRadius: '12px',
                 border: `2px solid ${colors.primary}`,
-                marginBottom: '24px',
-                width: '100%',
-                boxSizing: 'border-box'
+                marginBottom: '24px'
               }}>
                 <h2 style={{
                   fontSize: '24px',
                   color: 'black',
                   marginBottom: '20px',
-                  letterSpacing: '1px',
-                  wordWrap: 'break-word'
+                  letterSpacing: '1px'
                 }}>
                   NEXT STEPS
                 </h2>
@@ -1504,177 +2020,68 @@ export default function HolidayNutritionPlanner() {
                   fontFamily: 'Inter, sans-serif',
                   fontSize: '15px',
                   color: 'black',
-                  lineHeight: '1.8',
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word'
+                  lineHeight: '1.8'
                 }}>
                   <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <span style={{ color: colors.primary, fontWeight: 'bold', fontSize: '20px' }}>1.</span>
-                    <span>Screenshot this plan and save to your phone</span>
+                    <span>Screenshot this plan and save for reference</span>
                   </div>
                   <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <span style={{ color: colors.primary, fontWeight: 'bold', fontSize: '20px' }}>2.</span>
-                    <span>Pre-log your training days in MyFitnessPal or similar tracking app</span>
+                    <span>Pre-log training days in MyFitnessPal or similar tracking application</span>
                   </div>
                   <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <span style={{ color: colors.primary, fontWeight: 'bold', fontSize: '20px' }}>3.</span>
-                    <span>Mark holiday events on calendar - plan lighter meals before parties</span>
+                    <span>Prepare high-protein options (Greek yogurt, lean meats, protein powder)</span>
+                  </div>
+                  <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <span style={{ color: colors.primary, fontWeight: 'bold', fontSize: '20px' }}>4.</span>
+                    <span>Stock complex carb sources (oats, rice, sweet potato, fruit)</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <span style={{ color: colors.primary, fontWeight: 'bold', fontSize: '20px' }}>4.</span>
-                    <span>Follow us on Instagram @KeystoneEndurance for more helpful hints, recipes, and more great information for Triathletes and Distance Runners</span>
+                    <span style={{ color: colors.primary, fontWeight: 'bold', fontSize: '20px' }}>5.</span>
+                    <span>Plan strategic meals before events (protein + vegetables + moderate carbs)</span>
                   </div>
                 </div>
               </div>
 
-              {/* CTA */}
+              {/* Contact CTA */}
               <div style={{
-                padding: '24px 20px',
-                background: colors.primary,
+                background: `linear-gradient(135deg, ${colors.charcoal} 0%, #1a1a1a 100%)`,
+                padding: '32px',
                 borderRadius: '12px',
-                boxShadow: `0 8px 24px ${colors.primary}40`,
-                width: '100%',
-                boxSizing: 'border-box'
+                textAlign: 'center',
+                color: 'white'
               }}>
-                <div style={{
-                  fontSize: '22px',
-                  fontWeight: 'bold',
-                  color: 'white',
-                  marginBottom: '12px',
-                  letterSpacing: '1px',
-                  wordWrap: 'break-word',
-                  textAlign: 'center'
+                <h2 style={{
+                  fontSize: '28px',
+                  marginBottom: '16px',
+                  fontWeight: '800',
+                  letterSpacing: '1px'
                 }}>
-                  WANT MORE PERSONALIZED GUIDANCE?
-                </div>
-                <div style={{
-                  fontSize: '15px',
-                  fontFamily: 'Inter, sans-serif',
-                  color: 'white',
-                  opacity: 0.95,
-                  marginBottom: '20px',
-                  lineHeight: '1.8',
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word',
-                  textAlign: 'left'
+                  READY TO ELEVATE YOUR PERFORMANCE?
+                </h2>
+                <p style={{
+                  fontSize: '16px',
+                  marginBottom: '24px',
+                  opacity: 0.9,
+                  lineHeight: '1.6',
+                  fontFamily: 'Inter, sans-serif'
                 }}>
-                  <div style={{ marginBottom: '16px' }}>
-                    At Keystone Endurance, nutrition isn't a standalone plan—it's integrated into everything we do.
-                  </div>
-                  <div style={{ marginBottom: '16px' }}>
-                    Our certified nutrition coaches specialize in triathletes and distance runners, delivering race-specific fueling plans, supplement protocols, and body composition strategies tailored to YOUR 2026 goals.
-                  </div>
-                  <div style={{ marginBottom: '16px' }}>
-                    But here's what makes us different: We offer complete 1-to-1 Coaching that goes beyond just nutrition or just training. You get:
-                  </div>
-                  <div style={{ marginBottom: '8px', paddingLeft: '20px', textAlign: 'left' }}>
-                    ✅ Custom training programs (swim, bike, run, strength)
-                  </div>
-                  <div style={{ marginBottom: '8px', paddingLeft: '20px', textAlign: 'left' }}>
-                    ✅ Personalized nutrition coaching synced to your training phases
-                  </div>
-                  <div style={{ marginBottom: '8px', paddingLeft: '20px', textAlign: 'left' }}>
-                    ✅ Ongoing performance analysis and threshold testing
-                  </div>
-                  <div style={{ marginBottom: '8px', paddingLeft: '20px', textAlign: 'left' }}>
-                    ✅ Unlimited coach communication and bi-weekly calls
-                  </div>
-                  <div style={{ marginBottom: '16px', paddingLeft: '20px', textAlign: 'left' }}>
-                    ✅ Access to the Keystone Krew Community for support and accountability
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    This is comprehensive, performance-focused coaching designed around YOU.
-                  </div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <a 
-                    href="mailto:coach@keystoneendurance.com"
-                    style={{
-                      display: 'inline-block',
-                      padding: '12px 16px',
-                      background: 'white',
-                      color: colors.primary,
-                      fontWeight: 'bold',
-                      fontSize: '13px',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                      letterSpacing: '0.3px',
-                      textDecoration: 'none',
-                      transition: 'transform 0.2s',
-                      maxWidth: '95%',
-                      boxSizing: 'border-box',
-                      textAlign: 'center',
-                      lineHeight: '1.4'
-                    }}
-                    onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
-                    onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-                  >
-                    <div style={{ fontSize: '12px', marginBottom: '2px' }}>EMAIL US:</div>
-                    <div style={{ fontSize: '11px', letterSpacing: '0px' }}>COACH@KEYSTONEENDURANCE.COM</div>
-                  </a>
+                  This calculator provides foundation nutrition guidelines. For personalized coaching that includes training plans, race strategy, and accountability, Keystone Endurance offers comprehensive 1:1 coaching programs.
+                </p>
+                <div style={{
+                  fontSize: '14px',
+                  opacity: 0.7,
+                  fontFamily: 'Inter, sans-serif'
+                }}>
+                  Connect via Instagram: <strong>@keystoneendurance</strong>
                 </div>
               </div>
-
-            <button
-              onClick={() => { 
-                setStep(1); 
-                setFormData({ 
-                  gender: '', age: '', sport: '', weeklyHours: '', goal: '', 
-                  currentWeight: '', height: '', targetWeight: '', holidayEvents: '', 
-                  trainingDays: [] 
-                }); 
-                setResults(null);
-                setTimeout(() => {
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }, 100);
-              }}
-              style={{
-                width: '100%',
-                padding: '16px',
-                fontSize: '18px',
-                fontWeight: 'bold',
-                background: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                border: '2px solid white',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                letterSpacing: '1px',
-                fontFamily: 'Inter, sans-serif'
-              }}
-            >
-              START OVER
-            </button>
+            </div>
           </div>
-        </div>
           );
         })()}
-      </div>
-
-      {/* Footer */}
-      <div style={{
-        background: 'white',
-        padding: '24px',
-        borderTop: `2px solid ${colors.primary}40`,
-        marginTop: '60px'
-      }}>
-        <div style={{
-          maxWidth: '900px',
-          margin: '0 auto',
-          textAlign: 'center',
-          fontFamily: 'Inter, sans-serif',
-          fontSize: '14px',
-          color: 'black',
-          opacity: 0.7
-        }}>
-          <div style={{ marginBottom: '8px' }}>
-            © 2025 Keystone Endurance | Triathlete and Distance Runner Specialists
-          </div>
-          <div>
-            This planner provides general nutrition guidance. Consult healthcare providers for medical advice.
-          </div>
-        </div>
       </div>
     </div>
   );

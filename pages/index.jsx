@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function RaceTrainingNutritionPlanner() {
+export default function RaceTrainingNutritionGuide() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     gender: '',
@@ -11,7 +11,6 @@ export default function RaceTrainingNutritionPlanner() {
     currentWeight: '',
     height: '',
     targetWeight: '',
-    raceDate: '',
     weightLossRate: '', // 0.5, 1, 1.5, 2, or 'maintain'
     trainingDays: []
   });
@@ -92,23 +91,19 @@ export default function RaceTrainingNutritionPlanner() {
     const proteinGrams = Math.round(weightKg * 2.0);
     const proteinCals = proteinGrams * 4;
     
-    // Calculate REMAINING calories after protein
     const remainingTrainingCals = trainingDayCalories - proteinCals;
     const remainingRestCals = restDayCalories - proteinCals;
     
-    // Training days: 70% carbs, 30% fat from remaining
     const trainingCarbCals = Math.round(remainingTrainingCals * 0.70);
     const trainingFatCals = remainingTrainingCals - trainingCarbCals;
     const trainingCarbGrams = Math.round(trainingCarbCals / 4);
     const trainingFatGrams = Math.round(trainingFatCals / 9);
     
-    // Rest days: 50% carbs, 50% fat from remaining  
     const restCarbCals = Math.round(remainingRestCals * 0.50);
     const restFatCals = remainingRestCals - restCarbCals;
     const restCarbGrams = Math.round(restCarbCals / 4);
     const restFatGrams = Math.round(restFatCals / 9);
     
-    // Now totals MATCH the calorie target
     const finalTrainingCalories = (proteinGrams * 4) + (trainingCarbGrams * 4) + (trainingFatGrams * 9);
     const finalRestCalories = (proteinGrams * 4) + (restCarbGrams * 4) + (restFatGrams * 9);
     
@@ -122,8 +117,9 @@ export default function RaceTrainingNutritionPlanner() {
     const goalDate = new Date();
     goalDate.setDate(goalDate.getDate() + (weeksToGoal * 7));
     const goalDateStr = goalDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
 
-    // Calculate race date projections if race date provided
+    // Calculate race date projections
     let weeksToRace = 0;
     let projectedRaceWeight = parseFloat(formData.currentWeight);
     let raceDateStr = '';
@@ -170,6 +166,12 @@ export default function RaceTrainingNutritionPlanner() {
       expectedWeeklyLoss: expectedWeeklyLoss,
       weeksToGoal: weeksToGoal,
       goalDate: goalDateStr,
+      weeksToRace: weeksToRace,
+      projectedRaceWeight: projectedRaceWeight,
+      raceDate: raceDateStr,
+      targetWeight: parseFloat(formData.targetWeight) || 0,
+      currentWeight: parseFloat(formData.currentWeight) || 0,
+      height: formData.height,
       hitMinimumTraining: hitMinimumTraining,
       hitMinimumRest: hitMinimumRest,
       weeklyCalories: Math.round(
@@ -189,22 +191,22 @@ export default function RaceTrainingNutritionPlanner() {
     
     if (weightToLose <= 0) {
       recommendedRate = 'maintain';
-      reasoning = "Your current weight aligns with your target. A maintenance approach will support performance optimization and body composition.";
+      reasoning = "You're at or below target weight. Focus on maintenance or muscle gain.";
     } else if (weightToLose < 10) {
       recommendedRate = '0.5';
-      reasoning = "For body composition refinement under 10 pounds, a conservative approach optimally preserves lean muscle mass and training adaptations.";
+      reasoning = "For small weight loss goals (<10 lbs), slower is better to preserve muscle and performance.";
     } else if (weightToLose < 20) {
       recommendedRate = '1.0';
-      reasoning = "A moderate caloric deficit strategically balances fat loss with athletic performance, ensuring training quality remains high.";
+      reasoning = "Moderate deficit maintains training performance while losing fat steadily.";
     } else if (weightToLose < 50) {
       recommendedRate = '1.0';
-      reasoning = "This rate provides an optimal balance between achieving your body composition goals and maintaining the training intensity required for peak race performance.";
+      reasoning = "Good balance of fat loss and athletic performance for your goal.";
       if (hours < 8) {
         warnings.push("Consider 1.5 lb/week if you feel strong - your training volume can support it.");
       }
     } else {
       recommendedRate = '1.5';
-      reasoning = "For significant body composition changes, this moderate approach establishes a sustainable foundation. We'll monitor your response and adjust as needed to optimize both fat loss and performance.";
+      reasoning = "With substantial weight to lose, start with moderate deficit. You can adjust based on how you feel.";
     }
     
     // Athlete-specific adjustments
@@ -261,25 +263,6 @@ export default function RaceTrainingNutritionPlanner() {
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
-  };
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Keystone Endurance logo as base64 embedded image
@@ -598,7 +581,7 @@ export default function RaceTrainingNutritionPlanner() {
             fontFamily: 'Inter, sans-serif',
             fontWeight: '600'
           }}>
-            RACE TRAINING NUTRITION PLANNER
+            RACE TRAINING NUTRITION GUIDE
           </div>
         </div>
       </div>
@@ -987,6 +970,11 @@ export default function RaceTrainingNutritionPlanner() {
                 </div>
               </div>
 
+              <div>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+            </div>
 
             <div style={{ marginTop: '36px', display: 'flex', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
               <button
@@ -1011,25 +999,29 @@ export default function RaceTrainingNutritionPlanner() {
               </button>
               <button
                 onClick={nextStep}
-                disabled={formData.trainingDays.length === 0}
+                disabled={!formData.weeklyHours || formData.trainingDays.length === 0 || !formData.holidayEvents}
                 style={{
-                  flex: 1,
+                  flex: 2,
                   padding: '16px 8px',
                   fontSize: '16px',
                   fontWeight: 'bold',
-                  background: formData.trainingDays.length > 0 ? colors.primary : '#ccc',
+                  background: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents
+                    ? colors.primary
+                    : '#cccccc',
                   color: 'white',
                   border: 'none',
                   borderRadius: '12px',
-                  cursor: formData.trainingDays.length > 0 ? 'pointer' : 'not-allowed',
+                  cursor: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents ? 'pointer' : 'not-allowed',
                   transition: 'all 0.2s',
+                  boxShadow: formData.weeklyHours && formData.trainingDays.length > 0 && formData.holidayEvents
+                    ? `0 6px 20px ${colors.primary}60`
+                    : 'none',
                   letterSpacing: '0.5px',
                   whiteSpace: 'nowrap',
-                  boxSizing: 'border-box',
-                  opacity: formData.trainingDays.length > 0 ? 1 : 0.6
+                  boxSizing: 'border-box'
                 }}
               >
-                NEXT →
+                CONTINUE →
               </button>
             </div>
           </div>
@@ -1358,41 +1350,6 @@ export default function RaceTrainingNutritionPlanner() {
                 }}>
                   If body composition is part of your strategy
                 </div>
-
-              <div style={{marginBottom: '20px'}}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  fontSize: '16px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: '600',
-                  color: colors.charcoal
-                }}>
-                  TARGET RACE DATE
-                </label>
-                <input
-                  type="date"
-                  value={formData.raceDate}
-                  onChange={(e) => updateFormData('raceDate', e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  style={{
-                    width: '100%',
-                    padding: '16px',
-                    fontSize: '18px',
-                    border: `2px solid ${colors.primary}40`,
-                    borderRadius: '8px',
-                    fontFamily: 'Inter, sans-serif'
-                  }}
-                />
-                <div style={{
-                  fontSize: '14px',
-                  color: '#666',
-                  marginTop: '8px',
-                  fontFamily: 'Inter, sans-serif'
-                }}>
-                  Your nutrition strategy will be optimized to achieve your goal weight by race day
-                </div>
-              </div>
               </div>
 
               <div style={{
@@ -1493,35 +1450,6 @@ export default function RaceTrainingNutritionPlanner() {
                 textAlign: 'center',
                 marginBottom: '36px'
               }}>
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              zIndex: 10
-            }}>
-              <button
-                onClick={resetCalculator}
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  background: colors.primary,
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  letterSpacing: '1px',
-                  fontFamily: 'Inter, sans-serif',
-                  boxShadow: '0 4px 12px rgba(214, 32, 39, 0.3)'
-                }}
-                onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-              >
-                ↻ START OVER
-              </button>
-            </div>
-
                 <h1 style={{
                   fontSize: '52px',
                   margin: '0 0 12px 0',
@@ -1545,6 +1473,13 @@ export default function RaceTrainingNutritionPlanner() {
                   marginTop: '8px',
                   opacity: 0.7
                 }}>
+
+            {results.targetWeight > 0 && (
+              <div style={{fontSize: '16px', marginTop: '8px', color: '#666'}}>
+                Target Race Weight: {results.targetWeight} lbs
+                {results.raceDate && ` • Race Date: ${results.raceDate}`}
+              </div>
+            )}
                   Based on Mifflin-St Jeor equation • Age {formData.age} • {formData.currentWeight}lbs • {formData.height}" tall
                 </p>
               </div>
@@ -2104,7 +2039,6 @@ export default function RaceTrainingNutritionPlanner() {
                   </div>
                   <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <span style={{ color: colors.primary, fontWeight: 'bold', fontSize: '20px' }}>3.</span>
-                    <span>Mark holiday events on calendar - plan lighter meals before parties</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                     <span style={{ color: colors.primary, fontWeight: 'bold', fontSize: '20px' }}>4.</span>
@@ -2202,6 +2136,40 @@ export default function RaceTrainingNutritionPlanner() {
                 </div>
               </div>
 
+            <button
+              onClick={() => { 
+                setStep(1); 
+                setFormData({ 
+                  gender: '', age: '', sport: '', weeklyHours: '', goal: '', 
+                  currentWeight: '', height: '', targetWeight: '', holidayEvents: '', 
+                  trainingDays: [] 
+                }); 
+                setResults(null);
+                setTimeout(() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }, 100);
+              }}
+              style={{
+                width: '100%',
+                padding: '16px',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '2px solid white',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                letterSpacing: '1px',
+                fontFamily: 'Inter, sans-serif'
+              }}
+            >
+              START OVER
+            </button>
+          </div>
+        </div>
+          );
+        })()}
       </div>
 
       {/* Footer */}

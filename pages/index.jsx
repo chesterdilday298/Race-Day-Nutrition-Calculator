@@ -11,8 +11,8 @@ export default function HolidayNutritionPlanner() {
     currentWeight: '',
     height: '',
     targetWeight: '',
-    holidayEvents: '',
     raceDate: '',
+    holidayEvents: '',
     weightLossRate: '', // 0.5, 1, 1.5, 2, or 'maintain'
     trainingDays: []
   });
@@ -28,46 +28,8 @@ export default function HolidayNutritionPlanner() {
     light: '#F4F4F9' // Light background
   };
 
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const updateFormData = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const calculateNutrition = () => {
@@ -161,9 +123,7 @@ export default function HolidayNutritionPlanner() {
     const goalDate = new Date();
     goalDate.setDate(goalDate.getDate() + (weeksToGoal * 7));
     const goalDateStr = goalDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    
-    setResults({
-    
+
     // Calculate race date projections if race date provided
     let weeksToRace = 0;
     let projectedRaceWeight = parseFloat(formData.currentWeight);
@@ -182,6 +142,8 @@ export default function HolidayNutritionPlanner() {
       
       raceDateStr = raceDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
     }
+    
+    setResults({
       training: { 
         calories: finalTrainingCalories,
         maintenance: maintenanceTraining,
@@ -209,12 +171,6 @@ export default function HolidayNutritionPlanner() {
       expectedWeeklyLoss: expectedWeeklyLoss,
       weeksToGoal: weeksToGoal,
       goalDate: goalDateStr,
-      weeksToRace: weeksToRace,
-      projectedRaceWeight: projectedRaceWeight,
-      raceDate: raceDateStr,
-      targetWeight: parseFloat(formData.targetWeight) || 0,
-      currentWeight: parseFloat(formData.currentWeight) || 0,
-      height: formData.height,
       hitMinimumTraining: hitMinimumTraining,
       hitMinimumRest: hitMinimumRest,
       weeklyCalories: Math.round(
@@ -222,25 +178,6 @@ export default function HolidayNutritionPlanner() {
         (finalRestCalories * (7 - formData.trainingDays.length))
       )
     });
-  };
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getWeightLossRecommendation = () => {
@@ -277,44 +214,6 @@ export default function HolidayNutritionPlanner() {
     }
     
     return { recommendedRate, reasoning, warnings, weightToLose };
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  };
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getSafetyWarning = (rate) => {
@@ -349,25 +248,6 @@ export default function HolidayNutritionPlanner() {
     return warnings;
   };
 
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
 
   const nextStep = () => {
     if (step < 5) setStep(step + 1);
@@ -377,49 +257,11 @@ export default function HolidayNutritionPlanner() {
     }, 100);
   };
 
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
   const prevStep = () => {
     if (step > 1) setStep(step - 1);
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
-  };
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Keystone Endurance logo as base64 embedded image
@@ -492,25 +334,6 @@ export default function HolidayNutritionPlanner() {
           width: 22px;
           height: 22px;
           border: 2px solid ${colors.primary};
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
           border-radius: 4px;
           cursor: pointer;
           position: relative;
@@ -519,25 +342,6 @@ export default function HolidayNutritionPlanner() {
 
         .checkbox-wrapper input[type="checkbox"]:checked {
           background: ${colors.primary};
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
         }
 
         .checkbox-wrapper input[type="checkbox"]:checked::after {
@@ -1655,25 +1459,6 @@ export default function HolidayNutritionPlanner() {
             const sportName = sport.split('(')[0].trim();
             return sportName.charAt(0).toUpperCase() + sportName.slice(1).toLowerCase();
           };
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
           
           return (
           <div className="card-enter" style={{ width: '100%', maxWidth: '100%', padding: '0', margin: '0' }}>

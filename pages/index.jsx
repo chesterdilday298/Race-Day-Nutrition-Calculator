@@ -1011,6 +1011,28 @@ export default function RaceTrainingNutritionPlanner() {
               </button>
               <button
                 onClick={nextStep}
+                disabled={formData.trainingDays.length === 0}
+                style={{
+                  flex: 1,
+                  padding: '16px 8px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  background: formData.trainingDays.length > 0 ? colors.primary : '#ccc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: formData.trainingDays.length > 0 ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s',
+                  letterSpacing: '0.5px',
+                  whiteSpace: 'nowrap',
+                  boxSizing: 'border-box',
+                  opacity: formData.trainingDays.length > 0 ? 1 : 0.6
+                }}
+              >
+                NEXT →
+              </button>
+            </div>
+          </div>
         )}
 
         {step === 3 && (
@@ -2180,14 +2202,6 @@ export default function RaceTrainingNutritionPlanner() {
                 </div>
               </div>
 
-            <button
-              onClick={() => { 
-                setStep(1); 
-                setFormData({ 
-                  gender: '', age: '', sport: '', weeklyHours: '', goal: '', 
-        </div>
-          );
-        })()}
       </div>
 
       {/* Footer */}

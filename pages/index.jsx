@@ -87,23 +87,28 @@ export default function RaceTrainingNutritionGuide() {
     const hitMinimumTraining = (maintenanceTraining - deficitPerDay) < minCaloriesTraining;
     const hitMinimumRest = (maintenanceRest - deficitPerDay) < minCaloriesRest;
     
-    // FIXED: Calculate macros to FIT the calorie target
+    // Protein for athletes (2.0g per kg body weight for weight loss)
     const proteinGrams = Math.round(weightKg * 2.0);
     const proteinCals = proteinGrams * 4;
     
-    const remainingTrainingCals = trainingDayCalories - proteinCals;
-    const remainingRestCals = restDayCalories - proteinCals;
+    // Carbs based on training volume
+    const trainingCarbMultiplier = hours < 8 ? 4.5 : hours < 12 ? 5.5 : 6.5;
+    const trainingCarbGrams = Math.round(weightKg * trainingCarbMultiplier);
+    const trainingCarbCals = trainingCarbGrams * 4;
     
-    const trainingCarbCals = Math.round(remainingTrainingCals * 0.70);
-    const trainingFatCals = remainingTrainingCals - trainingCarbCals;
-    const trainingCarbGrams = Math.round(trainingCarbCals / 4);
-    const trainingFatGrams = Math.round(trainingFatCals / 9);
+    const restCarbGrams = Math.round(weightKg * 2.5);
+    const restCarbCals = restCarbGrams * 4;
     
-    const restCarbCals = Math.round(remainingRestCals * 0.50);
-    const restFatCals = remainingRestCals - restCarbCals;
-    const restCarbGrams = Math.round(restCarbCals / 4);
-    const restFatGrams = Math.round(restFatCals / 9);
+    // Fat fills remaining calories (minimum 15% of total calories)
+    const minTrainingFat = Math.round(trainingDayCalories * 0.15 / 9);
+    const trainingFatCals = trainingDayCalories - proteinCals - trainingCarbCals;
+    const trainingFatGrams = Math.round(Math.max(trainingFatCals / 9, minTrainingFat));
     
+    const minRestFat = Math.round(restDayCalories * 0.15 / 9);
+    const restFatCals = restDayCalories - proteinCals - restCarbCals;
+    const restFatGrams = Math.round(Math.max(restFatCals / 9, minRestFat));
+    
+    // Recalculate actual total calories based on macros
     const finalTrainingCalories = (proteinGrams * 4) + (trainingCarbGrams * 4) + (trainingFatGrams * 9);
     const finalRestCalories = (proteinGrams * 4) + (restCarbGrams * 4) + (restFatGrams * 9);
     
@@ -117,26 +122,6 @@ export default function RaceTrainingNutritionGuide() {
     const goalDate = new Date();
     goalDate.setDate(goalDate.getDate() + (weeksToGoal * 7));
     const goalDateStr = goalDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    
-
-    // Calculate race date projections
-    let weeksToRace = 0;
-    let projectedRaceWeight = parseFloat(formData.currentWeight);
-    let raceDateStr = '';
-    
-    if (formData.raceDate) {
-      const raceDate = new Date(formData.raceDate);
-      const today = new Date();
-      const timeDiff = raceDate - today;
-      weeksToRace = Math.floor(timeDiff / (7 * 24 * 60 * 60 * 1000));
-      
-      if (weeksToRace > 0 && expectedWeeklyLoss > 0) {
-        const totalWeightLoss = expectedWeeklyLoss * weeksToRace;
-        projectedRaceWeight = parseFloat(formData.currentWeight) - totalWeightLoss;
-      }
-      
-      raceDateStr = raceDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    }
     
     setResults({
       training: { 
@@ -166,12 +151,6 @@ export default function RaceTrainingNutritionGuide() {
       expectedWeeklyLoss: expectedWeeklyLoss,
       weeksToGoal: weeksToGoal,
       goalDate: goalDateStr,
-      weeksToRace: weeksToRace,
-      projectedRaceWeight: projectedRaceWeight,
-      raceDate: raceDateStr,
-      targetWeight: parseFloat(formData.targetWeight) || 0,
-      currentWeight: parseFloat(formData.currentWeight) || 0,
-      height: formData.height,
       hitMinimumTraining: hitMinimumTraining,
       hitMinimumRest: hitMinimumRest,
       weeklyCalories: Math.round(
@@ -263,25 +242,6 @@ export default function RaceTrainingNutritionGuide() {
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 100);
-  };
-
-  const resetCalculator = () => {
-    setStep(1);
-    setResults(null);
-    setFormData({
-      gender: '',
-      age: '',
-      sport: '',
-      weeklyHours: '',
-      goal: '',
-      currentWeight: '',
-      height: '',
-      targetWeight: '',
-      raceDate: '',
-      weightLossRate: '',
-      trainingDays: []
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Keystone Endurance logo as base64 embedded image
@@ -989,6 +949,7 @@ export default function RaceTrainingNutritionGuide() {
                 </div>
               </div>
 
+              <div>
 
             <div style={{ marginTop: '36px', display: 'flex', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
               <button
@@ -1464,35 +1425,6 @@ export default function RaceTrainingNutritionGuide() {
                 textAlign: 'center',
                 marginBottom: '36px'
               }}>
-            <div style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              zIndex: 10
-            }}>
-              <button
-                onClick={resetCalculator}
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '16px',
-                  fontWeight: 'bold',
-                  background: colors.primary,
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  letterSpacing: '1px',
-                  fontFamily: 'Inter, sans-serif',
-                  boxShadow: '0 4px 12px rgba(214, 32, 39, 0.3)'
-                }}
-                onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-                onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-              >
-                ↻ START OVER
-              </button>
-            </div>
-
                 <h1 style={{
                   fontSize: '52px',
                   margin: '0 0 12px 0',
@@ -1516,13 +1448,6 @@ export default function RaceTrainingNutritionGuide() {
                   marginTop: '8px',
                   opacity: 0.7
                 }}>
-
-            {results.targetWeight > 0 && (
-              <div style={{fontSize: '16px', marginTop: '8px', color: '#666'}}>
-                Target Race Weight: {results.targetWeight} lbs
-                {results.raceDate && ` • Race Date: ${results.raceDate}`}
-              </div>
-            )}
                   Based on Mifflin-St Jeor equation • Age {formData.age} • {formData.currentWeight}lbs • {formData.height}" tall
                 </p>
               </div>
@@ -2184,7 +2109,7 @@ export default function RaceTrainingNutritionGuide() {
                 setStep(1); 
                 setFormData({ 
                   gender: '', age: '', sport: '', weeklyHours: '', goal: '', 
-                  currentWeight: '', height: '', targetWeight: '', holidayEvents: '', 
+                  currentWeight: '', height: '', targetWeight: '', 
                   trainingDays: [] 
                 }); 
                 setResults(null);

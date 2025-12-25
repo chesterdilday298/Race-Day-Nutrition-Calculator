@@ -987,16 +987,6 @@ export default function RaceTrainingNutritionPlanner() {
                 </div>
               </div>
 
-              <div>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '8px',
-                  fontSize: '16px',
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: '600',
-                  color: colors.charcoal
-                }}>
-            </div>
 
             <div style={{ marginTop: '36px', display: 'flex', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
               <button

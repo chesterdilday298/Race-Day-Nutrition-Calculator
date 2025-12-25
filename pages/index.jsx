@@ -2156,8 +2156,6 @@ export default function RaceTrainingNutritionGuide() {
                 </div>
               </div>
 
-            </button>
-          </div>
         </div>
           );
         })()}

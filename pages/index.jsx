@@ -2131,31 +2131,51 @@ export default function RaceTrainingNutritionGuide() {
                     href="mailto:coach@keystoneendurance.com"
                     style={{
                       display: 'inline-block',
-                      padding: '12px 16px',
+                      padding: '20px 32px',
                       background: 'white',
                       color: colors.primary,
                       fontWeight: 'bold',
-                      fontSize: '13px',
-                      borderRadius: '8px',
+                      fontSize: '14px',
+                      borderRadius: '12px',
                       cursor: 'pointer',
                       boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                      letterSpacing: '0.3px',
+                      letterSpacing: '0.5px',
                       textDecoration: 'none',
                       transition: 'transform 0.2s',
                       maxWidth: '95%',
                       boxSizing: 'border-box',
                       textAlign: 'center',
-                      lineHeight: '1.4'
+                      lineHeight: '1.6'
                     }}
                     onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
                     onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
                   >
-                    <div style={{ fontSize: '12px', marginBottom: '2px' }}>EMAIL US:</div>
-                    <div style={{ fontSize: '11px', letterSpacing: '0px' }}>COACH@KEYSTONEENDURANCE.COM</div>
+                    <div style={{ fontSize: '13px', marginBottom: '4px', letterSpacing: '0.5px' }}>EMAIL US:</div>
+                    <div style={{ fontSize: '14px', letterSpacing: '0.3px' }}>COACH@KEYSTONEENDURANCE.COM</div>
                   </a>
                 </div>
               </div>
 
+            <button
+              onClick={resetCalculator}
+              style={{
+                width: '100%',
+                padding: '16px',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '2px solid white',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                letterSpacing: '1px',
+                fontFamily: 'Inter, sans-serif'
+              }}
+            >
+              ↻ START OVER
+            </button>
+          </div>
         </div>
           );
         })()}
@@ -2166,35 +2186,39 @@ export default function RaceTrainingNutritionGuide() {
       {step === 5 && results && (
         <div style={{
           textAlign: 'center',
-          marginTop: '40px',
-          marginBottom: '20px'
+          padding: '40px 20px',
+          maxWidth: '900px',
+          margin: '0 auto'
         }}>
           <button
             onClick={resetCalculator}
             style={{
-              padding: '16px 48px',
-              fontSize: '18px',
+              width: '100%',
+              maxWidth: '1040px',
+              padding: '24px',
+              fontSize: '22px',
               fontWeight: 'bold',
-              background: colors.primary,
-              color: 'white',
-              border: 'none',
+              background: 'white',
+              color: colors.primary,
+              border: `3px solid ${colors.primary}`,
               borderRadius: '12px',
               cursor: 'pointer',
               transition: 'all 0.2s',
               letterSpacing: '1px',
               fontFamily: 'Inter, sans-serif',
-              boxShadow: '0 4px 12px rgba(214, 32, 39, 0.3)'
+              boxShadow: 'none',
+              textTransform: 'uppercase'
             }}
-            onMouseOver={(e) => {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = '0 6px 16px rgba(214, 32, 39, 0.4)';
+            onMouseEnter={(e) => {
+              e.target.style.background = colors.primary;
+              e.target.style.color = 'white';
             }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.boxShadow = '0 4px 12px rgba(214, 32, 39, 0.3)';
+            onMouseLeave={(e) => {
+              e.target.style.background = 'white';
+              e.target.style.color = colors.primary;
             }}
           >
-            ↻ START OVER
+            START OVER
           </button>
         </div>
       )}
